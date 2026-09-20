@@ -25,7 +25,7 @@ class ExpenseTrackerError(Exception):
     for callers
     """
 
-class ValidatinErro(ExpenseTrackerError):
+class ValidationErro(ExpenseTrackerError):
     """ Raised when data supplied to a domain falls in itys own rules.
 
     Eg. A negative amount , an empoty category , an unkown categiry.
