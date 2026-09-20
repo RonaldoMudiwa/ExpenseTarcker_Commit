@@ -1,0 +1,5 @@
+# Runtime dependencies
+# (none yet: the day 1 domain model uses only the Python standard library)
+
+# Development dependencies
+pytest==8.3.3
