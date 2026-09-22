@@ -1,17 +1,10 @@
-"""Unit tests for the day 1 domain model.
+"""Tests for Transaction, Expense and the enums.
 
-Run them from the project root with::
+Run from the project root with: pytest
 
-    pytest -v
-
-Tests are grouped into classes by the behaviour under test rather than one
-flat file of functions. Each test name states the expected behaviour, so a
-failing run reads like a list of broken requirements.
-
-The tests exercise the public interface only (constructors, properties,
-``to_dict``). Private helpers such as ``_validate_amount`` are covered
-indirectly, which keeps the tests from breaking every time the internals are
-refactored.
+Grouped into classes by behaviour, so a failing run reads like a list of
+broken requirements. Only the public interface is tested, which means the
+internals can be reworked without rewriting the suite.
 """
 
 from __future__ import annotations
@@ -32,7 +25,7 @@ from expense_tracker import (
 
 
 class TestConstruction:
-    """Creating an expense from well formed input."""
+    """Building an expense from sensible input."""
 
     def test_stores_amount_as_decimal_with_two_places(self):
         expense = Expense("3.4", "Flat white", Category.EATING_OUT)
@@ -45,6 +38,7 @@ class TestConstruction:
         assert Expense("12.50", "Books", Category.EDUCATION).amount == Decimal("12.50")
 
     def test_rounds_half_up_the_way_people_expect(self):
+        # Python's default rounding would give 0.12 here.
         assert Expense("0.125", "Rounding", Category.OTHER).amount == Decimal("0.13")
 
     def test_collapses_whitespace_in_description(self):
@@ -74,7 +68,7 @@ class TestConstruction:
 
 
 class TestValidation:
-    """The object must refuse to exist in an invalid state."""
+    """The object refuses to exist in a broken state."""
 
     @pytest.mark.parametrize("bad_amount", [0, -1, "-4.50", Decimal("0.00")])
     def test_rejects_non_positive_amounts(self, bad_amount):
@@ -83,6 +77,8 @@ class TestValidation:
 
     @pytest.mark.parametrize("bad_amount", ["abc", None, True, [5]])
     def test_rejects_amounts_that_are_not_numbers(self, bad_amount):
+        # True is in there because bool subclasses int, so it would
+        # otherwise slip through as the amount 1.00.
         with pytest.raises(ValidationError):
             Expense(bad_amount, "Bad", Category.OTHER)
 
@@ -104,6 +100,7 @@ class TestValidation:
             Expense("5.00", "Lunch", Category.OTHER, "18/09/2026")
 
     def test_setter_validation_leaves_the_object_untouched(self):
+        # A rejected write must not half update the object.
         expense = Expense("5.00", "Lunch", Category.EATING_OUT)
         with pytest.raises(ValidationError):
             expense.amount = -10
@@ -116,7 +113,7 @@ class TestValidation:
 
 
 class TestAbstraction:
-    """The base class describes a contract and cannot stand alone."""
+    """The base class is a contract, not something you can build."""
 
     def test_transaction_cannot_be_instantiated(self):
         with pytest.raises(TypeError):
@@ -127,7 +124,7 @@ class TestAbstraction:
 
 
 class TestPolymorphism:
-    """Behaviour that varies by subclass while the interface stays fixed."""
+    """Same interface, different behaviour per subclass."""
 
     def test_signed_amount_is_negative_for_expenses(self):
         expense = Expense("42.15", "Weekly shop", Category.GROCERIES)
@@ -151,9 +148,10 @@ class TestPolymorphism:
 
 
 class TestEqualityAndOrdering:
-    """Entity semantics: identity comes from the stored identifier."""
+    """Identity comes from the id, not from the values."""
 
     def test_two_expenses_with_identical_data_are_not_equal(self):
+        # Two identical coffees are still two separate purchases.
         first = Expense("5.00", "Lunch", Category.EATING_OUT, "2026-09-18")
         second = Expense("5.00", "Lunch", Category.EATING_OUT, "2026-09-18")
         assert first != second
@@ -205,13 +203,21 @@ class TestSerialization:
         assert restored.transaction_date == original.transaction_date
         assert restored.transaction_id == original.transaction_id
 
+    def test_default_expense_survives_a_round_trip(self):
+        # The constructor default and the from_dict fallback have to agree,
+        # or a default expense quietly changes when it is saved and loaded.
+        original = Expense("5.00", "Lunch")
+        restored = Expense.from_dict(original.to_dict())
+        assert restored.payment_method is original.payment_method
+        assert restored.category is original.category
+
     def test_missing_required_key_raises_serialization_error(self):
         with pytest.raises(SerializationError):
             Expense.from_dict({"description": "No amount"})
 
 
 class TestEnums:
-    """The enum helpers shared by category and payment method."""
+    """The helpers shared by Category and PaymentMethod."""
 
     def test_from_string_is_case_and_separator_insensitive(self):
         assert Category.from_string("  Eating Out ") is Category.EATING_OUT
