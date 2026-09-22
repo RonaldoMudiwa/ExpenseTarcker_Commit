@@ -1,16 +1,4 @@
-"""
-The 'Expense' Class the first real 'Transaction'
-
-This file is shoprter than transaction.py , all the validation,
-equality , hashing and serialisation scaffolding was written all in the base class.
-So new transaction only have to supply what is genuinley different about it::
-
-*Two extra fields (category and payment method),
-*the direction of the money (''signed_amount'' is negative'')
-*how it print itslef (''summary_line'').
-
-This is all because of inheritance.
-"""
+"""Money going out."""
 
 from __future__ import annotations
 
@@ -18,102 +6,99 @@ from datetime import date as date_type
 from decimal import Decimal
 from typing import Any, Mapping
 
-from .enums import Category,PaymentMethod
-from .exceptions import ValidationError
+from .enums import Category, PaymentMethod, coerce_enum
 from .transaction import Transaction
 
 
 class Expense(Transaction):
-    """ Money leaving the Users Pockets.
+    """A single purchase or payment.
 
-    EG.
-     from decimal import Decimal
-     coffee = Expense(
-                    amount = "4.00"
-                    descrpition = "Coffee"
-                    category = "Eating out"
-                    transaction_date = "2026-09-20"
-     )
-     >>> coffe.amount
+    Short compared with Transaction, because validating, comparing, hashing
+    and saving were all written once in the base class. An expense only adds
+    what is actually different: two extra fields, a negative direction, and
+    how it prints.
+
+        >>> coffee = Expense("4.00", "Flat white", "eating out", "2026-09-20")
+        >>> coffee.amount
         Decimal('4.00')
-     >>> coffe.signed_amount
+        >>> coffee.signed_amount
         Decimal('-4.00')
     """
 
-#: Overides the place hoilder on the base class. Written to storage and used later
-# to pick the right class when reading data back.
-
     TRANSACTION_TYPE = "expense"
 
-    def __init__(self , amount: Decimal | int | float | str,
-              description: str,
-              category: Category | str = Category.OTHER,
-              transaction_date: date_type | str | None = None,
-              payment_method: PaymentMethod | str = PaymentMethod.OTHER,
-              transaction_id: str | None = None,
+    def __init__(
+        self,
+        amount: Decimal | int | float | str,
+        description: str,
+        category: Category | str = Category.OTHER,
+        transaction_date: date_type | str | None = None,
+        payment_method: PaymentMethod | str = PaymentMethod.OTHER,
+        transaction_id: str | None = None,
     ) -> None:
-        """ Create a Validated expense.
+        """Create an expense.
 
         Args:
-            amount: Positivce amount Spent
-            escription: What the money was spent on.
-            category: A ``Category`` member, or text such as ``"eating out"``.
+            amount: A positive amount spent.
+            description: What the money went on.
+            category: A Category member, or text like "eating out".
             transaction_date: Date of the spend. Defaults to today.
-            payment_method: A ``PaymentMethod`` member, or equivalent text.
-            transaction_id: Existing identifier when rebuilding from storage.
+            payment_method: A PaymentMethod member, or equivalent text.
+            transaction_id: An existing id, used when loading from storage.
 
         Raises:
-            ValidationError: If any argument fails validation.
+            ValidationError: If any argument fails its check.
         """
-        #''super().__init__'' runs the shared validation first. 
-        # Calling it before touching the subclass state means a half-built object is never
-        #left behind if the base class rejects an argument.
-
+        # Run the shared validation first. If the base class rejects
+        # something, no half built object is left behind.
         super().__init__(
-                amount = amount,
-                description= description,
-                transaction_date = transaction_date,
-                transaction_id = transaction_id
-            )
-        
-        #Assign via the properties so their validation runs here too.
+            amount=amount,
+            description=description,
+            transaction_date=transaction_date,
+            transaction_id=transaction_id,
+        )
+
+        # Through the properties, so these get validated too.
         self.category = category
         self.payment_method = payment_method
 
-        #-----------------------------------------------
-        # Subclass specific properties
-        #-----------------------------------------------
+    # ------------------------------------------------------------------
+    # Fields
+    # ------------------------------------------------------------------
 
     @property
     def category(self) -> Category:
-            """What the money was spent on."""
-            return self._category
+        """What the money was spent on."""
+        return self._category
 
     @category.setter
-    def category(self, value: Category| str) -> None:
-            self._category = self._coerce_enum(value, Category)
+    def category(self, value: Category | str) -> None:
+        self._category = coerce_enum(value, Category)
 
     @property
     def payment_method(self) -> PaymentMethod:
-            """ Where was the money paid from"""
-            return self._payment_method
+        """Which account the money left."""
+        return self._payment_method
 
     @payment_method.setter
-    def payment_method(self, value: PaymentMethod| str) -> None:
-            self._payment_method = self._coerce_enum(value, PaymentMethod)
-        
-        #------------------------------
-        #Implements of the abstract contract
-        #-------------------------------------
+    def payment_method(self, value: PaymentMethod | str) -> None:
+        self._payment_method = coerce_enum(value, PaymentMethod)
+
+    # ------------------------------------------------------------------
+    # The base class contract
+    # ------------------------------------------------------------------
 
     @property
     def signed_amount(self) -> Decimal:
-            """ Expenses reduce the balance, so the signed amount is negative."""
-            return -self.amount
+        """Negative, because an expense lowers the balance."""
+        return -self.amount
 
     def summary_line(self) -> str:
-        """ Return one aligned line, e.g. ''2026-09-18 -£4.00 Coffee. """
+        """One line, e.g. "2026-09-18  -£    3.40  Eating Out      Flat white".
 
+        The column widths match Income.summary_line, so a mixed list prints
+        as a tidy table with no extra work.
+        """
         return (
             f"{self.transaction_date.isoformat()}  "
             f"-£{self.amount:>8,.2f}  "
@@ -121,66 +106,36 @@ class Expense(Transaction):
             f"{self.description}"
         )
 
-    #-------------------------------------
-    #Serialisation
-    #-------------------------------------
+    # ------------------------------------------------------------------
+    # Saving and loading
+    # ------------------------------------------------------------------
 
-    def _extra_fields(self) -> Mapping[str,Any]:
-        """ Add the expense-only keys to the dictionary built by the base."""
+    def _extra_fields(self) -> Mapping[str, Any]:
+        """The two keys only an expense has."""
         return {
-                "category": self.category.value,
-                "payment_method": self.payment_method.value,
+            "category": self.category.value,
+            "payment_method": self.payment_method.value,
         }
 
     @classmethod
-    def  from_dict(cls,data:Mapping[str,Any]) -> "Expense":
-        """ Rebuild an ''Expense'' from the output of ''to_dict''.
+    def from_dict(cls, data: Mapping[str, Any]) -> "Expense":
+        """Rebuild an Expense from what to_dict produced.
 
-        A ''classmethod'' rather than a ''staticmethod'' because it needs
-        ''cls'' to construct the object. That also means any future subclass of
-        ''Expense'' inherits this factory and returns  its own type.
+        A classmethod, not a staticmethod, because it needs cls to build the
+        object. Any future subclass inherits this and gets its own type back.
 
-        Args: 
-            data : A  mapping produced by ''to_dict'' (or read from JSON).
-
-        Returns:
-            The reconstructed expense, carrying its original identifier.
+        Missing optional keys fall back to the same defaults as __init__, so
+        a record saved by an older version still loads.
 
         Raises:
-            SerializationError: If a required key is missing.
-            ValidationError:  If a stored value is no longer valid.
+            SerializationError: If amount or description is missing.
+            ValidationError: If a stored value is no longer valid.
         """
-
         return cls(
-                    amount = cls._require(data, "amount"),
-                    description= cls._require(data, "description"),
-                    category = data.get("category", Category.OTHER),
-                    transaction_date = data.get("date"),
-                    payment_method = data.get("payment_method",PaymentMethod.OTHER),
-                    transaction_id=data.get("transaction_id"),   
+            amount=cls._require(data, "amount"),
+            description=cls._require(data, "description"),
+            category=data.get("category", Category.OTHER),
+            transaction_date=data.get("date"),
+            payment_method=data.get("payment_method", PaymentMethod.OTHER),
+            transaction_id=data.get("transaction_id"),
         )
-
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------       
-
-    @staticmethod
-    def _coerce_enum(value:Any, enum_class: type) -> Any:
-        """ Accept either an enum member or text and return a valid member.
-
-            Keeping this in one helper means ''category'' and ''paymenth_mathod''
-            share identical behavior and identical error messages.
-        """
-
-        if isinstance(value, enum_class):
-            return value
-        if isinstance(value, str):
-            return enum_class.from_string(value)
-        raise ValidationError(
-            f"{enum_class.__name__} must be a {enum_class.__name__} member or "
-            f"text, got {type(value).__name__}."
-
-        )
-
-
-

@@ -1,81 +1,53 @@
-"""The exception hierarchy for the whole package.
+"""All the errors this package can raise.
 
-Why define our own exceptions at all, when ``ValueError`` already exists?
-
-* **Catchability.** Every error this package raises inherits from one base
-  class, so a caller can write ``except ExpenseTrackerError`` and catch
-  everything we raise without also swallowing unrelated bugs from the
-  standard library.
-* **Meaning.** ``TransactionNotFoundError`` says far more at a call site
-  than ``KeyError`` does, and it lets the command line interface (Day 6)
-  print a sensible message per error type instead of one generic apology.
-* **Stability.** The internals can change how a failure is detected without
-  changing the exception the caller has been told to expect.
-
-The hierarchy is deliberately shallow. Depth in an exception tree is only
-worth paying for when callers genuinely need to catch at different levels.
+Everything inherits from ExpenseTrackerError, so one except clause catches
+the lot without also swallowing unrelated bugs.
 
     ExpenseTrackerError
-    ├── ValidationError
-    ├── SerializationError
-    └── LedgerError
-        ├── DuplicateTransactionError
-        └── TransactionNotFoundError
+    |-- ValidationError
+    |-- SerializationError
+    |-- LedgerError
+        |-- DuplicateTransactionError
+        |-- TransactionNotFoundError
 """
 
 from __future__ import annotations
 
 
 class ExpenseTrackerError(Exception):
-    """Base class for every error raised by this package.
-
-    Nothing raises this directly. It exists so that callers have a single
-    name to catch, which is the standard convention for a Python library.
-    """
+    """Base class for every error in this package. Never raised directly."""
 
 
 class ValidationError(ExpenseTrackerError):
-    """Raised when a value would put a domain object into an invalid state.
+    """A value would leave an object in a broken state.
 
-    Examples: a negative amount, an empty description, an unknown category.
-
-    The domain object validates itself rather than trusting the caller. That
-    is the whole point of encapsulation: an object should never be able to
-    exist in an invalid state.
+    A negative amount, a blank description, a category that doesn't exist.
     """
 
 
 class SerializationError(ExpenseTrackerError):
-    """Raised when a dictionary cannot be turned back into a domain object.
-
-    Used by the ``from_dict`` factory methods when a required key is missing
-    or holds a value of the wrong shape.
-    """
+    """Stored data can't be turned back into an object, usually a missing key."""
 
 
 class LedgerError(ExpenseTrackerError):
-    """Base class for problems with the *collection* of transactions.
+    """Something is wrong with the collection rather than one transaction.
 
-    Separated from ``ValidationError`` on purpose. A validation failure is
-    about one object being wrong in itself; a ledger error is about an
-    otherwise valid object being wrong *for this collection*, such as
-    adding the same transaction twice.
+    The transaction itself may be perfectly valid. It just doesn't belong
+    here, or isn't here at all.
     """
 
 
 class DuplicateTransactionError(LedgerError):
-    """Raised when a transaction already present in the ledger is added again.
+    """This transaction is already in the ledger.
 
-    The ledger indexes transactions by their identifier, so silently
-    accepting a duplicate would either double count the money or quietly
-    discard an entry. Both are worse than a loud failure.
+    Accepting it would either double count the money or quietly drop one of
+    the two. Failing loudly beats both.
     """
 
 
 class TransactionNotFoundError(LedgerError):
-    """Raised when a lookup or removal names an identifier the ledger lacks.
+    """No transaction in the ledger has that id.
 
-    Chosen over the built in ``KeyError`` because the ledger is a domain
-    object, not a dictionary, and its callers should not have to know that a
-    dictionary happens to be the storage used underneath.
+    Raised instead of KeyError so callers don't need to know a dict is doing
+    the work underneath.
     """

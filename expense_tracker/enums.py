@@ -1,15 +1,7 @@
-"""Enumerations used across the expense tracker.
+"""Fixed sets of values: spending categories, payment methods, income sources.
 
-An enum is the right tool whenever a field may only hold one of a fixed,
-known set of values. Compared with passing raw strings around it gives us:
-
-* a single definition of the allowed values (no typos in "grocries"),
-* autocompletion and static checking in editors,
-* a natural place to hang behaviour, such as a human readable label.
-
-All enums below inherit from ``str`` as well as ``Enum``. That makes every
-member behave like a normal string (so ``json.dumps`` and f-strings just
-work) while still being a proper enum member.
+Each one inherits from str as well as Enum, so members behave like normal
+strings and json.dumps handles them without any extra work.
 """
 
 from __future__ import annotations
@@ -19,50 +11,36 @@ from typing import Any, TypeVar
 
 from .exceptions import ValidationError
 
-#: Type variable used by :func:`coerce_enum` so that static type checkers
-#: know the function returns a member of the exact enum passed in, not a
-#: vague ``Enum``.
 _EnumT = TypeVar("_EnumT", bound=Enum)
 
 
 class _LabelledEnum(str, Enum):
-    """Shared behaviour for the enums in this module.
+    """Shared helpers for the enums below, so they aren't written three times.
 
-    This class exists purely so that ``Category``, ``PaymentMethod`` and
-    ``IncomeSource`` do not duplicate the same two helpers. It is a small
-    but real example of inheritance being used to remove duplication, and of
-    the DRY principle (Don't Repeat Yourself) applied to code we control.
-
-    It is deliberately private (leading underscore): it is an implementation
-    detail of this module, not part of the public API of the package.
+    Private because it is a detail of this module, not part of the package's
+    public API.
     """
 
     @property
     def label(self) -> str:
-        """Return a human readable name, e.g. ``"Eating Out"``.
-
-        Implemented as a property rather than a method because it reads as a
-        simple attribute at the call site (``category.label``) and performs
-        no meaningful work beyond formatting.
-        """
+        """A display name, so "eating_out" reads as "Eating Out"."""
         return self.value.replace("_", " ").title()
 
     @classmethod
     def from_string(cls, raw: str) -> "_LabelledEnum":
-        """Build a member from free text, tolerating case and spacing.
+        """Build a member from messy text, ignoring case and separators.
 
-        This is a *factory method*: an alternative constructor that takes
-        messy real world input (from a CSV, a form, a command line) and
-        returns a valid member, or raises a clear error.
+        Handles input from CSV files, forms and the command line, where
+        nobody types "eating_out" exactly.
 
         Args:
-            raw: Text such as ``"Eating Out"``, ``"eating_out"`` or ``"  BILLS "``.
+            raw: Text such as "Eating Out", "eating-out" or "  BILLS ".
 
         Returns:
-            The matching enum member.
+            The matching member.
 
         Raises:
-            ValidationError: If ``raw`` is not a string or matches no member.
+            ValidationError: If the text matches nothing, or isn't text.
         """
         if not isinstance(raw, str):
             raise ValidationError(
@@ -70,8 +48,8 @@ class _LabelledEnum(str, Enum):
                 f"got {type(raw).__name__}."
             )
 
-        # Normalise once, then compare. Lowercase, trim, and treat spaces and
-        # hyphens as underscores so "Eating Out" and "eating-out" both work.
+        # Tidy the input once, then compare. Spaces and hyphens both become
+        # underscores so "Eating Out" and "eating-out" reach the same member.
         normalised = raw.strip().lower().replace(" ", "_").replace("-", "_")
 
         for member in cls:
@@ -84,27 +62,19 @@ class _LabelledEnum(str, Enum):
         )
 
     def __str__(self) -> str:
-        """Print the friendly label when the member is shown to a user."""
+        """Show the friendly label when printed."""
         return self.label
 
 
 def coerce_enum(value: Any, enum_class: type[_EnumT]) -> _EnumT:
-    """Accept an enum member or text and return a valid member of ``enum_class``.
+    """Turn a member or a piece of text into a member of enum_class.
 
-    Every domain object that stores an enum field needs exactly this logic:
-    pass members through untouched, parse strings, reject anything else with
-    a consistent message. Writing it once here means ``Expense`` and
-    ``Income`` cannot drift apart in how they treat bad input.
-
-    Args:
-        value: An existing member, or text such as ``"eating out"``.
-        enum_class: The enum the value must belong to.
-
-    Returns:
-        A valid member of ``enum_class``.
+    Every class that stores an enum field needs this same logic, so it lives
+    here once. That way Expense and Income can't drift apart in how they
+    handle bad input.
 
     Raises:
-        ValidationError: If the value is neither a member nor parsable text.
+        ValidationError: If the value is neither a member nor usable text.
     """
     if isinstance(value, enum_class):
         return value
@@ -116,13 +86,9 @@ def coerce_enum(value: Any, enum_class: type[_EnumT]) -> _EnumT:
     )
 
 
-@unique  # guarantees no two members share the same value
+@unique  # stops two members sharing a value
 class Category(_LabelledEnum):
-    """The spending categories a single expense can belong to.
-
-    Kept deliberately short for now. Week 1 adds reporting that groups
-    expenses by this field, so the list is intended to be stable.
-    """
+    """What an expense was spent on."""
 
     GROCERIES = "groceries"
     EATING_OUT = "eating_out"
@@ -139,12 +105,10 @@ class Category(_LabelledEnum):
 
 @unique
 class PaymentMethod(_LabelledEnum):
-    """How an expense was paid for.
+    """Where the money for an expense came from.
 
-    Separate from ``Category`` because the two answer different questions:
-    a category says *what the money was for*, a payment method says *where
-    the money came from*. Keeping them apart is the Single Responsibility
-    Principle applied at the level of data modelling.
+    Kept apart from Category because the two answer different questions:
+    what the money was for, versus which account it left.
     """
 
     CASH = "cash"
@@ -157,18 +121,11 @@ class PaymentMethod(_LabelledEnum):
 
 @unique
 class IncomeSource(_LabelledEnum):
-    """Where a single piece of income came from.
+    """Where a payment came from.
 
-    Income deliberately does not reuse ``Category``. A category describes
-    what money was spent on; a source describes where money arrived from.
-    Forcing both through one enum would create members that are nonsense for
-    half the code that touches them ("income of category Groceries"), which
-    is exactly the kind of leaky model that causes defensive ``if`` checks
-    later on.
-
-    Adding this enum, rather than widening an existing one, is the Open
-    Closed Principle in practice: the package grows by adding new code, not
-    by editing code that already works.
+    Income gets its own enum rather than reusing Category. Sharing one would
+    allow nonsense like "income of category Groceries", and every report
+    would then need guard clauses to filter it out.
     """
 
     SALARY = "salary"

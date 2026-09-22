@@ -1,34 +1,8 @@
-"""An ordered, de-duplicated collection of transactions.
+"""A collection of transactions that keeps itself tidy.
 
-Day 1 produced objects. This module produces the thing that *holds* them.
-
-A plain ``list`` would have worked. It was rejected for three reasons, each
-worth being able to defend:
-
-1. **Invariants.** A list cannot stop you appending the same transaction
-   twice, or appending a string by accident. ``TransactionLedger`` enforces
-   both rules in one place, so no calling code has to remember them.
-2. **Behaviour belongs with data.** ``balance``, ``total_income`` and
-   ``total_expenses`` are questions about the collection as a whole. Leaving
-   them as loose functions scattered around the app is how procedural code
-   ends up duplicated. This is encapsulation applied one level up, to a
-   collection rather than a single object.
-3. **Lookup cost.** Finding a transaction by identifier in a list is a scan.
-   The ledger keeps a dictionary index alongside the order, so lookup and
-   membership tests are constant time while iteration stays in insertion
-   order.
-
-The class subclasses ``collections.abc.Sequence`` rather than ``list``.
-Inheriting from ``list`` would expose ``append``, ``insert``, ``extend`` and
-``__setitem__``, every one of which bypasses the validation above; the
-ledger would promise an invariant it could not keep. Composition (holding a
-list privately) plus an abstract base class gives the useful half of a
-list's interface and none of the dangerous half. This is "favour composition
-over inheritance", and the Interface Segregation Principle, in one decision.
-
-Because ``Sequence`` is implemented, a ledger already works with ``for``,
-``len()``, ``in``, indexing, slicing, ``reversed()``, ``sorted()``,
-unpacking and comprehensions, with no extra code.
+A plain list would have worked, but a list can't stop you adding the same
+transaction twice or appending a string by mistake. Putting those rules in
+one place means no calling code has to remember them.
 """
 
 from __future__ import annotations
@@ -44,46 +18,44 @@ from .exceptions import (
 )
 from .transaction import Transaction
 
-# Zero as a ``Decimal``, defined once. Used as the starting value for every
-# sum so that an empty ledger returns Decimal("0.00") rather than the int 0,
-# keeping the return type of these properties consistent.
+# Defined once so an empty ledger returns Decimal("0.00") rather than int 0,
+# keeping the return type of the totals consistent.
 ZERO = Decimal("0.00")
 
 
 class TransactionLedger(Sequence):
     """An ordered collection of unique transactions.
 
-    Order is insertion order, not date order. Sorting is left to the caller
-    (``sorted(ledger)`` works, since transactions compare by date) because a
-    ledger that silently reordered itself would make the display layer's job
-    harder, not easier.
+    Subclasses Sequence rather than list. Inheriting from list would hand out
+    append, insert and __setitem__, all of which skip the checks below, so
+    the ledger would promise something it couldn't deliver. Holding a list
+    privately gives the useful half of a list and none of the risky half.
 
-    Example:
+    Because Sequence is implemented, len(), in, indexing, slicing, iteration,
+    reversed(), sorted() and unpacking all work with no extra code.
+
+    Order is insertion order, not date order. Sorting is left to the caller,
+    since a collection that quietly reordered itself would make the display
+    code harder to reason about, not easier.
+
         >>> ledger = TransactionLedger()
         >>> ledger.add(Expense("3.40", "Flat white", Category.EATING_OUT))
         >>> ledger.add(Income("2400", "Salary", IncomeSource.SALARY))
-        >>> len(ledger)
-        2
         >>> ledger.balance
         Decimal('2396.60')
     """
 
     def __init__(self, transactions: Iterable[Transaction] | None = None) -> None:
-        """Create a ledger, optionally pre-filled.
-
-        Args:
-            transactions: Any iterable of transactions. Each one is added
-                through :meth:`add`, so the same validation applies as if
-                they had been added one at a time. Defaults to empty.
+        """Create a ledger, optionally filled from any iterable.
 
         Raises:
-            ValidationError: If any item is not a ``Transaction``.
+            ValidationError: If an item is not a Transaction.
             DuplicateTransactionError: If the iterable repeats a transaction.
         """
-        # Two structures, one source of truth. ``_order`` preserves insertion
-        # order for iteration and indexing; ``_by_id`` gives constant time
-        # lookup. They are only ever written by ``add`` and ``remove``, which
-        # is what keeps them in step.
+        # Two structures, one source of truth. _order keeps insertion order
+        # for iterating and indexing; _by_id makes lookup instant instead of
+        # a scan. Only add() and remove() touch them, which is what keeps
+        # them in step.
         self._order: list[Transaction] = []
         self._by_id: dict[str, Transaction] = {}
 
@@ -91,31 +63,23 @@ class TransactionLedger(Sequence):
             self.extend(transactions)
 
     # ------------------------------------------------------------------
-    # Mutation, the only two methods allowed to touch the internals
+    # Changing the contents
     # ------------------------------------------------------------------
 
     def add(self, transaction: Transaction) -> Transaction:
-        """Add one transaction to the end of the ledger.
+        """Add one transaction to the end and return it.
 
-        Args:
-            transaction: Any concrete ``Transaction``, so ``Expense``,
-                ``Income``, or any subclass added in future. The ledger is
-                written entirely against the abstract base class and never
-                asks which one it has.
-
-        Returns:
-            The transaction that was added, so calls can be chained or the
-            result captured in one line.
+        Works with any Transaction subclass, now or later, because the ledger
+        is written against the base class and never asks which one it has.
 
         Raises:
-            ValidationError: If the object is not a ``Transaction``.
-            DuplicateTransactionError: If its identifier is already present.
+            ValidationError: If the object is not a Transaction.
+            DuplicateTransactionError: If its id is already here.
         """
-        # An explicit type check at a public boundary, rather than trusting
-        # duck typing. The ledger's guarantees (a balance that means
-        # something, ids that are unique) depend on every member honouring
-        # the ``Transaction`` contract, so this is the one place worth being
-        # strict about it.
+        # An explicit type check rather than trusting duck typing. The
+        # ledger's promises (a balance that means something, ids that are
+        # unique) all rest on every member honouring the Transaction
+        # contract, so this is the one place worth being strict.
         if not isinstance(transaction, Transaction):
             raise ValidationError(
                 "Only Transaction objects can be added to a ledger, got "
@@ -135,36 +99,22 @@ class TransactionLedger(Sequence):
     def extend(self, transactions: Iterable[Transaction]) -> None:
         """Add several transactions in order.
 
-        The operation is not atomic: transactions before a failure stay
-        added. That is deliberate and documented rather than hidden, because
-        rolling back would mean copying the whole ledger on every bulk add
-        for a situation that indicates a bug in the caller anyway.
-
-        Args:
-            transactions: Any iterable of transactions.
-
-        Raises:
-            ValidationError: If any item is not a ``Transaction``.
-            DuplicateTransactionError: If any item is already present.
+        Not all or nothing: anything added before a failure stays added.
+        That is documented rather than hidden, because rolling back would
+        mean copying the whole ledger on every bulk add, for a situation that
+        means the caller has a bug anyway.
         """
         for transaction in transactions:
             self.add(transaction)
 
     def remove(self, transaction_id: str) -> Transaction:
-        """Remove a transaction by its identifier and return it.
+        """Remove a transaction by id and return it.
 
-        Removal is by identifier rather than by object so the command line
-        interface (Day 6) can delete an entry using text typed by the user,
-        without first having to find the object.
-
-        Args:
-            transaction_id: The identifier to remove.
-
-        Returns:
-            The transaction that was removed.
+        By id rather than by object, so Day 6's command line can delete an
+        entry from text the user typed without finding the object first.
 
         Raises:
-            TransactionNotFoundError: If no such identifier is held.
+            TransactionNotFoundError: If no transaction has that id.
         """
         transaction = self._by_id.pop(transaction_id, None)
         if transaction is None:
@@ -181,98 +131,77 @@ class TransactionLedger(Sequence):
         self._by_id.clear()
 
     # ------------------------------------------------------------------
-    # Lookup
+    # Finding things
     # ------------------------------------------------------------------
 
     def get(self, transaction_id: str) -> Transaction:
-        """Return the transaction with this identifier.
-
-        Args:
-            transaction_id: The identifier to look up.
-
-        Returns:
-            The matching transaction. Constant time, because of the index.
+        """Return the transaction with this id. Instant, thanks to the index.
 
         Raises:
-            TransactionNotFoundError: If no such identifier is held.
+            TransactionNotFoundError: If no transaction has that id.
         """
         try:
             return self._by_id[transaction_id]
         except KeyError as exc:
-            # Re-raised as a domain error so callers never have to know that
-            # a dictionary is used underneath. ``from exc`` keeps the
-            # original traceback for debugging.
+            # Re-raised as our own error so callers never need to know a dict
+            # is involved. "from exc" keeps the original traceback.
             raise TransactionNotFoundError(
                 f"No transaction with id {transaction_id!r} in this ledger."
             ) from exc
 
     def filter_by(self, predicate: Callable[[Transaction], bool]) -> "TransactionLedger":
-        """Return a new ledger holding only the transactions that match.
+        """Return a new ledger of the transactions that match.
 
-        Takes a function rather than a set of named arguments so that Day 4's
-        date, category and text filters can all be expressed without this
-        class growing a new parameter each time. The original is untouched,
-        so filters can be chained safely.
+        Takes a function rather than a pile of named arguments, so Day 4's
+        date, category and text filters all fit without this class growing a
+        parameter each time. The original is untouched, so filters chain.
 
-        Args:
-            predicate: A callable taking a transaction and returning a bool.
-
-        Returns:
-            A new ``TransactionLedger``. The transaction objects inside are
-            shared, not copied, so editing one is visible in both ledgers.
+        The transaction objects are shared, not copied, so editing one shows
+        up in both ledgers.
         """
         return TransactionLedger(t for t in self._order if predicate(t))
 
     def of_type(self, transaction_type: type) -> "TransactionLedger":
-        """Return a new ledger holding only transactions of the given class.
-
-        Args:
-            transaction_type: For example ``Income`` or ``Expense``.
-
-        Returns:
-            A new ``TransactionLedger`` containing the matching entries.
-        """
+        """Return a new ledger of just one class, e.g. of_type(Income)."""
         return self.filter_by(lambda t: isinstance(t, transaction_type))
 
     # ------------------------------------------------------------------
-    # Aggregates, the payoff of polymorphism
+    # Totals
     # ------------------------------------------------------------------
 
     @property
     def balance(self) -> Decimal:
-        """Net position: income received minus money spent.
+        """Money in minus money out.
 
-        One expression over a mixed collection, with no ``isinstance`` check
-        and no ``if`` on transaction type. Each object already knows the
-        direction it moves money in, so adding a new transaction class later
-        requires no change to this line.
+        One expression over a mixed collection, no isinstance, no branching
+        on type. Each object already knows which way it moves money, so a new
+        transaction class later would need no change to this line.
         """
         return sum((t.signed_amount for t in self._order), start=ZERO)
 
     @property
     def total_income(self) -> Decimal:
-        """Sum of every amount that increases the balance."""
+        """Everything that raises the balance."""
         return sum(
             (t.signed_amount for t in self._order if t.signed_amount > 0), start=ZERO
         )
 
     @property
     def total_expenses(self) -> Decimal:
-        """Sum of every amount that decreases the balance, as a positive number.
+        """Everything that lowers the balance, as a positive number.
 
-        Returned unsigned because reports read better as "spent £412.80"
-        than "spent £-412.80". The sign is a presentation concern here, not a
-        property of the data.
+        Unsigned because "spent £412.80" reads better than "spent £-412.80".
+        The sign is a display choice here, not part of the data.
         """
         return -sum(
             (t.signed_amount for t in self._order if t.signed_amount < 0), start=ZERO
         )
 
     def summary(self) -> str:
-        """Return a short, printable overview of the ledger.
+        """A short printable overview.
 
-        Kept separate from ``__str__`` so that the short form (used in logs
-        and error messages) and the full form (shown to a user) can differ.
+        Separate from __str__ so the brief version (logs, error messages) and
+        the full listing can differ.
         """
         if not self._order:
             return "Ledger is empty."
@@ -287,37 +216,28 @@ class TransactionLedger(Sequence):
         return "\n".join(lines)
 
     def of_type_count(self, transaction_type_tag: str) -> int:
-        """Count transactions whose class declares this ``TRANSACTION_TYPE``.
+        """Count transactions carrying this TRANSACTION_TYPE tag.
 
-        Counting by the class attribute rather than by ``isinstance`` keeps
-        this method from importing ``Income`` or ``Expense``, so the ledger
-        stays dependent only on the abstraction it was written against. That
-        is the Dependency Inversion Principle: high level code depends on
-        ``Transaction``, not on the concrete classes below it.
-
-        Args:
-            transaction_type_tag: For example ``"income"`` or ``"expense"``.
-
-        Returns:
-            How many transactions carry that tag.
+        Counting by the tag rather than by isinstance keeps this file from
+        importing Income or Expense, so the ledger depends only on the base
+        class it was written against.
         """
         return sum(1 for t in self._order if t.TRANSACTION_TYPE == transaction_type_tag)
 
     def to_dicts(self) -> list[dict[str, Any]]:
-        """Serialise every transaction, ready for the Day 3 JSON storage layer.
+        """Every transaction as a dictionary, ready for Day 3's storage layer.
 
-        Each object serialises itself through the template method defined in
-        ``Transaction``, so this method needs no knowledge of the fields any
-        particular subclass holds.
+        Each object serialises itself, so this needs no knowledge of what
+        fields any particular subclass holds.
         """
         return [t.to_dict() for t in self._order]
 
     # ------------------------------------------------------------------
-    # Container protocol
+    # Behaving like a Python container
     # ------------------------------------------------------------------
 
     def __len__(self) -> int:
-        """Support ``len(ledger)``."""
+        """len(ledger)."""
         return len(self._order)
 
     @overload
@@ -327,33 +247,30 @@ class TransactionLedger(Sequence):
     def __getitem__(self, index: slice) -> "TransactionLedger": ...
 
     def __getitem__(self, index: int | slice) -> Transaction | "TransactionLedger":
-        """Support ``ledger[0]`` and ``ledger[:3]``.
+        """ledger[0] and ledger[:3].
 
-        A slice returns another ``TransactionLedger`` rather than a list, so
-        that the result still answers ``balance`` and can be filtered
-        further. Returning the same type from a slice is the convention every
-        well behaved sequence follows.
+        A slice gives back another ledger rather than a list, so the result
+        still answers .balance and can be filtered again. Returning your own
+        type from a slice is what every well behaved sequence does.
         """
         if isinstance(index, slice):
             return TransactionLedger(self._order[index])
         return self._order[index]
 
     def __iter__(self) -> Iterator[Transaction]:
-        """Support ``for transaction in ledger``.
+        """for transaction in ledger.
 
-        ``Sequence`` would supply an iterator built on repeated indexing.
-        Iterating the internal list directly is both faster and clearer.
+        Sequence would build an iterator out of repeated indexing. Iterating
+        the internal list is faster and clearer.
         """
         return iter(self._order)
 
     def __contains__(self, item: object) -> bool:
-        """Support ``transaction in ledger`` and ``"some-uuid" in ledger``.
+        """transaction in ledger, and also "some-id" in ledger.
 
-        Accepting either an object or a bare identifier is a small
-        convenience for the command line layer, which only ever holds the
-        text a user typed. Both paths are a dictionary lookup, so membership
-        stays constant time instead of the linear scan ``Sequence`` would
-        otherwise perform.
+        Accepting a bare id helps the command line layer, which only ever has
+        the text the user typed. Both routes are a dict lookup, so this stays
+        instant instead of the scan Sequence would otherwise do.
         """
         if isinstance(item, Transaction):
             return item.transaction_id in self._by_id
@@ -362,30 +279,19 @@ class TransactionLedger(Sequence):
         return False
 
     def __bool__(self) -> bool:
-        """An empty ledger is falsey, matching every other Python container.
-
-        Defined explicitly rather than left to ``__len__`` so the intent is
-        obvious to a reader.
-        """
+        """An empty ledger is falsey, like every other Python container."""
         return bool(self._order)
 
     def __add__(self, other: "TransactionLedger") -> "TransactionLedger":
-        """Combine two ledgers into a new one, leaving both unchanged.
-
-        Args:
-            other: The ledger to merge in.
-
-        Returns:
-            A new ledger holding this ledger's transactions followed by the
-            other's.
+        """Combine two ledgers into a new one, leaving both alone.
 
         Raises:
-            DuplicateTransactionError: If the two ledgers share a transaction.
+            DuplicateTransactionError: If the two share a transaction.
         """
         if not isinstance(other, TransactionLedger):
-            # Returning ``NotImplemented`` rather than raising lets Python
-            # try the other operand's ``__radd__`` before giving up with a
-            # standard TypeError. Raising here would short circuit that.
+            # Returning NotImplemented lets Python try the other operand's
+            # __radd__ before giving up with a TypeError. Raising here would
+            # cut that short.
             return NotImplemented
 
         combined = TransactionLedger(self._order)
@@ -393,18 +299,17 @@ class TransactionLedger(Sequence):
         return combined
 
     def __repr__(self) -> str:
-        """Unambiguous form for debugging, as ``repr`` is meant to be."""
+        """Debugging form."""
         return (
             f"{type(self).__name__}(size={len(self._order)}, "
             f"balance={self.balance})"
         )
 
     def __str__(self) -> str:
-        """Readable table of every transaction, one per line.
+        """One line per transaction.
 
-        Each line comes from the transaction's own ``summary_line``, so the
-        ledger formats a mixed collection without knowing anything about the
-        classes inside it.
+        Each line comes from the transaction itself, so the ledger formats a
+        mixed collection without knowing anything about the classes in it.
         """
         if not self._order:
             return "Ledger is empty."

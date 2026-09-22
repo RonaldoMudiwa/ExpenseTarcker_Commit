@@ -1,18 +1,15 @@
 """Personal Expense Tracker.
 
-A small, well structured Python application for recording and analysing
-personal spending. Built over one week as project 1 of a 12 week portfolio,
-with every object oriented principle applied deliberately rather than
-decoratively.
+A command line tool for recording and analysing personal spending. Project 1
+of a 12 week portfolio.
 
-This file is the package's front door. Importing the handful of names that
-callers actually need means user code can write::
+This file is the package's front door. Importing the handful of names callers
+actually need lets user code write:
 
     from expense_tracker import Expense, Income, TransactionLedger
 
-instead of reaching into module paths that may be reorganised later. The
-``__all__`` list states the public API explicitly, so everything not on it
-is understood to be internal.
+instead of reaching into module paths that might move later. Anything not in
+__all__ is internal.
 """
 
 from .enums import Category, IncomeSource, PaymentMethod
@@ -36,12 +33,12 @@ __all__ = [
     "Category",
     "PaymentMethod",
     "IncomeSource",
-    # Domain model
+    # Model
     "Transaction",
     "Expense",
     "Income",
     "TransactionLedger",
-    # Exceptions
+    # Errors
     "ExpenseTrackerError",
     "ValidationError",
     "SerializationError",

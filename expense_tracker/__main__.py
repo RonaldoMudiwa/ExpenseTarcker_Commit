@@ -1,15 +1,14 @@
-"""Runnable demonstration of the Day 2 domain model.
+"""A quick demo of what the model can do so far.
 
-Run it from the project root with::
+Run it from the project root:
 
     python -m expense_tracker
 
-Naming the file ``__main__.py`` is what makes ``python -m expense_tracker``
-work: Python executes this module when the package is run as a script.
+The file has to be called __main__.py for that command to work: Python runs
+this module when the package is executed as a script.
 
-This is a temporary shop window for the model. It is replaced by the real
-command line interface on Day 6, which is why it lives in a few small
-functions and touches nothing else in the package.
+Temporary. The real command line interface replaces it on Day 6, which is why
+it stays in small functions and touches nothing else.
 """
 
 from __future__ import annotations
@@ -22,10 +21,10 @@ from .ledger import TransactionLedger
 
 
 def build_sample_ledger() -> TransactionLedger:
-    """Return a ledger of hand written transactions used purely for the demo.
+    """A month of made up transactions.
 
-    The list passed in mixes ``Expense`` and ``Income`` freely. Nothing in
-    the ledger, and nothing below, ever asks which is which.
+    The list mixes Income and Expense freely, and nothing below ever asks
+    which is which.
     """
     return TransactionLedger(
         [
@@ -47,15 +46,15 @@ def build_sample_ledger() -> TransactionLedger:
     )
 
 
-def demonstrate_polymorphism(ledger: TransactionLedger) -> None:
-    """Print each transaction using the object's own formatting."""
+def show_transactions(ledger: TransactionLedger) -> None:
+    """Print every transaction, each formatting itself."""
     print("All transactions")
     print("-" * 64)
-    print(ledger)  # __str__ calls summary_line on each member
+    print(ledger)
 
 
-def demonstrate_container_protocol(ledger: TransactionLedger) -> None:
-    """Show that the ledger behaves like any other Python sequence."""
+def show_container_behaviour(ledger: TransactionLedger) -> None:
+    """Show that the ledger works like any other Python sequence."""
     print("\nContainer behaviour")
     print("-" * 64)
     print(f"len(ledger)          -> {len(ledger)}")
@@ -67,8 +66,8 @@ def demonstrate_container_protocol(ledger: TransactionLedger) -> None:
     print(f"repr(ledger)         -> {ledger!r}")
 
 
-def demonstrate_aggregates(ledger: TransactionLedger) -> None:
-    """Show the totals, computed without a single type check."""
+def show_totals(ledger: TransactionLedger) -> None:
+    """Show the totals, worked out with no type checks anywhere."""
     print("\nSummary")
     print("-" * 64)
     print(ledger.summary())
@@ -82,8 +81,8 @@ def demonstrate_aggregates(ledger: TransactionLedger) -> None:
     print(f"Spent on groceries:      £{groceries.total_expenses:,.2f}")
 
 
-def demonstrate_error_handling(ledger: TransactionLedger) -> None:
-    """Show that the ledger refuses to enter an invalid state."""
+def show_guard_rails(ledger: TransactionLedger) -> None:
+    """Show the ledger refusing to end up in a broken state."""
     print("\nGuard rails")
     print("-" * 64)
 
@@ -99,15 +98,14 @@ def demonstrate_error_handling(ledger: TransactionLedger) -> None:
 
 
 def main() -> None:
-    """Run every demonstration in order."""
+    """Run each demo in turn."""
     ledger = build_sample_ledger()
-    demonstrate_polymorphism(ledger)
-    demonstrate_container_protocol(ledger)
-    demonstrate_aggregates(ledger)
-    demonstrate_error_handling(ledger)
+    show_transactions(ledger)
+    show_container_behaviour(ledger)
+    show_totals(ledger)
+    show_guard_rails(ledger)
 
 
-# The standard guard. It means importing this module (for example, by a test)
-# does not run the demo, while executing the package still does.
+# Without this guard, importing the module would run the demo.
 if __name__ == "__main__":
     main()
