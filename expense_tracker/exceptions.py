@@ -6,6 +6,7 @@ the lot without also swallowing unrelated bugs.
     ExpenseTrackerError
     |-- ValidationError
     |-- SerializationError
+    |-- StorageError
     |-- LedgerError
         |-- DuplicateTransactionError
         |-- TransactionNotFoundError
@@ -27,6 +28,10 @@ class ValidationError(ExpenseTrackerError):
 
 class SerializationError(ExpenseTrackerError):
     """Stored data can't be turned back into an object, usually a missing key."""
+
+
+class StorageError(ExpenseTrackerError):
+    """Saving or loading failed, e.g. the file isn't valid JSON."""
 
 
 class LedgerError(ExpenseTrackerError):

@@ -9,8 +9,9 @@ validation that actually holds, and tests that document what the code promises.
 
 ## Status
 
-Day 2 of 7. Two transaction types and a collection to hold them. Storage,
-reporting and the command line interface follow over the rest of the week.
+Day 3 of 7. Two transaction types, a collection to hold them, and JSON
+storage so nothing is lost when the program closes. Search, reporting and the
+command line interface follow over the rest of the week.
 
 ## Quick start
 
@@ -53,11 +54,14 @@ ExpenseTarcker_Commit/
 │   ├── transaction.py    Abstract base class
 │   ├── expense.py        Money going out
 │   ├── income.py         Money coming in
-│   └── ledger.py         Collection of transactions
+│   ├── ledger.py         Collection of transactions
+│   ├── factory.py        Rebuilds the right class from saved data
+│   └── repository.py     Saving and loading
 ├── tests/
 │   ├── test_expense.py
 │   ├── test_income.py
-│   └── test_ledger.py
+│   ├── test_ledger.py
+│   └── test_repository.py
 ├── data/                 Runtime storage, ignored by git
 ├── pytest.ini
 └── requirements.txt
@@ -128,6 +132,29 @@ ledger.filter_by(lambda t: t.amount > 100)
 print(ledger)                     # one formatted line per transaction
 ```
 
+## Saving and loading
+
+```python
+from expense_tracker import JSONTransactionRepository
+
+repo = JSONTransactionRepository("data/transactions.json")
+repo.save(ledger)          # writes the whole ledger
+ledger = repo.load()       # empty ledger if the file doesn't exist yet
+```
+
+The rest of the app only knows about `TransactionRepository`, an abstract class
+with two methods, `load` and `save`. `JSONTransactionRepository` is one way of
+doing that. `InMemoryTransactionRepository` is another, used in tests. Moving to
+SQLite later means writing one more class, not rewriting the app.
+
+Each saved record carries a `"type"` key. `TransactionFactory` reads it and hands
+the record to `Expense` or `Income`. A new transaction type is added with
+`factory.register(NewType)`, with no edits to the factory itself.
+
+Saving writes to a temporary file first and then swaps it in, so a crash half
+way through a save leaves the old file whole. A damaged file raises
+`StorageError` with the reason, never a random crash.
+
 ## Week plan
 
 | Day | Focus |
@@ -143,10 +170,10 @@ print(ledger)                     # one formatted line per transaction
 ## Tests
 
 ```bash
-pytest          # 142 tests
+pytest          # 176 tests
 pytest -q       # quiet
 ```
 
 Grouped by behaviour (`TestValidation`, `TestPolymorphism`,
-`TestContainerProtocol`, `TestSerialization`) and written against the public
+`TestContainerProtocol`, `TestRoundTrip`, `TestBadFiles`) and written against the public
 interface only, so refactoring the internals does not break them.

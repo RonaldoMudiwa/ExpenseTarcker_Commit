@@ -18,15 +18,22 @@ from .exceptions import (
     ExpenseTrackerError,
     LedgerError,
     SerializationError,
+    StorageError,
     TransactionNotFoundError,
     ValidationError,
 )
 from .expense import Expense
+from .factory import TransactionFactory
 from .income import Income
 from .ledger import TransactionLedger
+from .repository import (
+    InMemoryTransactionRepository,
+    JSONTransactionRepository,
+    TransactionRepository,
+)
 from .transaction import Transaction
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 __all__ = [
     # Enums
@@ -38,10 +45,16 @@ __all__ = [
     "Expense",
     "Income",
     "TransactionLedger",
+    # Storage
+    "TransactionFactory",
+    "TransactionRepository",
+    "JSONTransactionRepository",
+    "InMemoryTransactionRepository",
     # Errors
     "ExpenseTrackerError",
     "ValidationError",
     "SerializationError",
+    "StorageError",
     "LedgerError",
     "DuplicateTransactionError",
     "TransactionNotFoundError",

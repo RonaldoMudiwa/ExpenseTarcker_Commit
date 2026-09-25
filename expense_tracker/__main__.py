@@ -18,6 +18,10 @@ from .exceptions import DuplicateTransactionError, TransactionNotFoundError
 from .expense import Expense
 from .income import Income
 from .ledger import TransactionLedger
+from .repository import JSONTransactionRepository
+
+# Relative to the project root, where the command is run from.
+DATA_FILE = "data/transactions.json"
 
 
 def build_sample_ledger() -> TransactionLedger:
@@ -97,6 +101,21 @@ def show_guard_rails(ledger: TransactionLedger) -> None:
         print(f"Missing id rejected: {exc}")
 
 
+def show_storage(ledger: TransactionLedger) -> None:
+    """Save to a file, load it back, and check nothing changed."""
+    print("\nSaving and loading")
+    print("-" * 64)
+
+    repository = JSONTransactionRepository(DATA_FILE)
+    repository.save(ledger)
+    print(f"Saved {len(ledger)} transactions to {repository.path}")
+
+    reloaded = repository.load()
+    print(f"Loaded {len(reloaded)} transactions back")
+    print(f"Same balance after reload: {reloaded.balance == ledger.balance}")
+    print(f"Same transactions after reload: {list(reloaded) == list(ledger)}")
+
+
 def main() -> None:
     """Run each demo in turn."""
     ledger = build_sample_ledger()
@@ -104,6 +123,7 @@ def main() -> None:
     show_container_behaviour(ledger)
     show_totals(ledger)
     show_guard_rails(ledger)
+    show_storage(ledger)
 
 
 # Without this guard, importing the module would run the demo.

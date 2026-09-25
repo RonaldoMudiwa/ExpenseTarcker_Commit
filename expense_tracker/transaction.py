@@ -233,6 +233,12 @@ class Transaction(ABC):
         """Extra keys for to_dict. Subclasses override this; empty by default."""
         return {}
 
+    @classmethod
+    @abstractmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "Transaction":
+        """Rebuild a transaction from what to_dict produced."""
+        raise NotImplementedError  # pragma: no cover - the ABC enforces this
+
     @staticmethod
     def _require(data: Mapping[str, Any], key: str) -> Any:
         """Read a required key, or raise a clear error. Used by from_dict."""
