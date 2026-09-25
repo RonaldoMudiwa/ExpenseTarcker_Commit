@@ -24,6 +24,17 @@ from .exceptions import (
 )
 from .expense import Expense
 from .factory import TransactionFactory
+from .filters import (
+    AmountRangeFilter,
+    CategoryFilter,
+    DateRangeFilter,
+    IncomeSourceFilter,
+    MatchAll,
+    TextSearchFilter,
+    TransactionFilter,
+    TypeFilter,
+    all_of,
+)
 from .income import Income
 from .ledger import TransactionLedger
 from .repository import (
@@ -33,7 +44,7 @@ from .repository import (
 )
 from .transaction import Transaction
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 __all__ = [
     # Enums
@@ -50,6 +61,16 @@ __all__ = [
     "TransactionRepository",
     "JSONTransactionRepository",
     "InMemoryTransactionRepository",
+    # Filters
+    "TransactionFilter",
+    "DateRangeFilter",
+    "CategoryFilter",
+    "IncomeSourceFilter",
+    "TypeFilter",
+    "AmountRangeFilter",
+    "TextSearchFilter",
+    "MatchAll",
+    "all_of",
     # Errors
     "ExpenseTrackerError",
     "ValidationError",
