@@ -9,9 +9,9 @@ validation that actually holds, and tests that document what the code promises.
 
 ## Status
 
-Day 3 of 7. Two transaction types, a collection to hold them, and JSON
-storage so nothing is lost when the program closes. Search, reporting and the
-command line interface follow over the rest of the week.
+Day 4 of 7. Two transaction types, a collection to hold them, JSON storage,
+and search by date, category, amount and text. Reporting and the command line
+interface follow over the rest of the week.
 
 ## Quick start
 
@@ -56,12 +56,14 @@ ExpenseTarcker_Commit/
 │   ├── income.py         Money coming in
 │   ├── ledger.py         Collection of transactions
 │   ├── factory.py        Rebuilds the right class from saved data
-│   └── repository.py     Saving and loading
+│   ├── repository.py     Saving and loading
+│   └── filters.py        Search rules that join with & | ~
 ├── tests/
 │   ├── test_expense.py
 │   ├── test_income.py
 │   ├── test_ledger.py
-│   └── test_repository.py
+│   ├── test_repository.py
+│   └── test_filters.py
 ├── data/                 Runtime storage, ignored by git
 ├── pytest.ini
 └── requirements.txt
@@ -155,6 +157,37 @@ Saving writes to a temporary file first and then swaps it in, so a crash half
 way through a save leaves the old file whole. A damaged file raises
 `StorageError` with the reason, never a random crash.
 
+## Searching
+
+Each filter asks one yes or no question. They join with `&` (and), `|` (or)
+and `~` (not), and pass straight into `ledger.filter_by`:
+
+```python
+from expense_tracker import (
+    Category, CategoryFilter, DateRangeFilter, TextSearchFilter, all_of,
+)
+
+september = DateRangeFilter.for_month(2026, 9)
+food = CategoryFilter(Category.GROCERIES, Category.EATING_OUT)
+
+ledger.filter_by(september & food)                     # food in September
+ledger.filter_by(food & ~TextSearchFilter("tesco"))    # food, not from Tesco
+ledger.filter_by(all_of(september, food)).total_expenses
+```
+
+| Filter | Keeps |
+| --- | --- |
+| `DateRangeFilter(start, end)` | Dates in the range, both ends included. `for_month(year, month)` builds one for a whole month |
+| `CategoryFilter(*categories)` | Expenses in any of the categories |
+| `IncomeSourceFilter(*sources)` | Income from any of the sources |
+| `TypeFilter(Expense)` | One kind of transaction |
+| `AmountRangeFilter(minimum, maximum)` | Amounts in the range, both ends included |
+| `TextSearchFilter(text)` | Descriptions containing the text, any case |
+
+A new kind of search is one small class with a `matches` method. The joining
+with `&`, `|` and `~` comes from the `TransactionFilter` base class, and the
+ledger needs no changes at all.
+
 ## Week plan
 
 | Day | Focus |
@@ -170,7 +203,7 @@ way through a save leaves the old file whole. A damaged file raises
 ## Tests
 
 ```bash
-pytest          # 176 tests
+pytest          # 233 tests
 pytest -q       # quiet
 ```
 

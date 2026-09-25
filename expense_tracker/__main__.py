@@ -16,6 +16,13 @@ from __future__ import annotations
 from .enums import Category, IncomeSource, PaymentMethod
 from .exceptions import DuplicateTransactionError, TransactionNotFoundError
 from .expense import Expense
+from .filters import (
+    AmountRangeFilter,
+    CategoryFilter,
+    DateRangeFilter,
+    TextSearchFilter,
+    TypeFilter,
+)
 from .income import Income
 from .ledger import TransactionLedger
 from .repository import JSONTransactionRepository
@@ -76,13 +83,8 @@ def show_totals(ledger: TransactionLedger) -> None:
     print("-" * 64)
     print(ledger.summary())
 
-    recurring = ledger.filter_by(lambda t: getattr(t, "is_recurring", False))
-    print(f"\nReliable monthly income: £{recurring.total_income:,.2f}")
-
-    groceries = ledger.filter_by(
-        lambda t: getattr(t, "category", None) is Category.GROCERIES
-    )
-    print(f"Spent on groceries:      £{groceries.total_expenses:,.2f}")
+    groceries = ledger.filter_by(CategoryFilter(Category.GROCERIES))
+    print(f"\nSpent on groceries: £{groceries.total_expenses:,.2f}")
 
 
 def show_guard_rails(ledger: TransactionLedger) -> None:
@@ -99,6 +101,31 @@ def show_guard_rails(ledger: TransactionLedger) -> None:
         ledger.remove("not-a-real-id")
     except TransactionNotFoundError as exc:
         print(f"Missing id rejected: {exc}")
+
+
+def show_search(ledger: TransactionLedger) -> None:
+    """Pick out transactions with filters."""
+    print("\nSearching")
+    print("-" * 64)
+
+    first_week = DateRangeFilter("2026-09-01", "2026-09-07")
+    print("First week of September:")
+    print(ledger.filter_by(first_week))
+
+    food = CategoryFilter(Category.GROCERIES, Category.EATING_OUT)
+    print("\nFood and drink:")
+    print(ledger.filter_by(food))
+
+    print("\nDescription mentions 'shop':")
+    print(ledger.filter_by(TextSearchFilter("shop")))
+
+    # & means and, | means or, ~ means not.
+    big_spending = TypeFilter(Expense) & AmountRangeFilter(minimum=40)
+    print("\nExpenses of £40 or more:")
+    print(ledger.filter_by(big_spending))
+
+    print("\nEverything except rent:")
+    print(ledger.filter_by(~TextSearchFilter("rent")))
 
 
 def show_storage(ledger: TransactionLedger) -> None:
@@ -123,6 +150,7 @@ def main() -> None:
     show_container_behaviour(ledger)
     show_totals(ledger)
     show_guard_rails(ledger)
+    show_search(ledger)
     show_storage(ledger)
 
 
