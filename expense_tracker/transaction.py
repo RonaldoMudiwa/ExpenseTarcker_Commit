@@ -1,9 +1,4 @@
-"""The base class every money movement inherits from.
-
-Transaction says what any transaction must be able to do. Expense and Income
-say how. Shared work (validating, comparing, saving) is written here once so
-the subclasses stay small.
-"""
+"""The base class every kind of transaction inherits from."""
 
 from __future__ import annotations
 
@@ -16,9 +11,8 @@ from typing import Any, Mapping
 
 from .exceptions import SerializationError, ValidationError
 
-# Money is a Decimal, never a float. In binary floating point
-# 0.1 + 0.2 == 0.30000000000000004, which is fine for physics and useless
-# for money. Decimal stores base 10 digits exactly.
+# Money is kept as Decimal, never float, because 0.1 + 0.2 as floats gives
+# 0.30000000000000004.
 MONEY_PRECISION = Decimal("0.01")
 MAX_DESCRIPTION_LENGTH = 120
 
@@ -26,15 +20,9 @@ MAX_DESCRIPTION_LENGTH = 120
 class Transaction(ABC):
     """One movement of money, in or out.
 
-    Fields are properties rather than plain attributes so validation runs on
-    every write, not just at construction:
-
-        expense.amount = -5     # raises, and the object is unchanged
-
-    Two transactions are equal when they are the same type with the same id,
-    the way a database row works. Two coffees at the same price on the same
-    day are still two separate purchases, so comparing every field would give
-    the wrong answer.
+    Every field is checked whenever it is set, so a transaction can never
+    hold a bad value. Two transactions are equal when they share an id, so
+    two identical coffees on the same day still count as two purchases.
     """
 
     # Written into saved data so the loader knows which class to rebuild.
@@ -48,24 +36,21 @@ class Transaction(ABC):
         transaction_date: date_type | str | None = None,
         transaction_id: str | None = None,
     ) -> None:
-        """Create a transaction, checking every field first.
-
+        """
         Args:
-            amount: A positive amount. Direction is the subclass's job, so
-                the stored number is never negative.
+            amount: Always positive. Whether it is money in or out depends
+                on the subclass.
             description: Short note, e.g. "Weekly shop at Tesco".
-            transaction_date: A date or an ISO string. Defaults to today.
-            transaction_id: An existing id, used when loading from storage.
-                A new UUID is generated otherwise.
+            transaction_date: A date or "YYYY-MM-DD". Defaults to today.
+            transaction_id: Only passed when loading saved data.
 
         Raises:
-            ValidationError: If any argument fails its check.
+            ValidationError: If any value is not allowed.
         """
         # Set once, with no setter, so it can't be changed from outside.
         self._transaction_id: str = transaction_id or str(uuid.uuid4())
 
-        # Go through the properties, not the private attributes, so the
-        # validation runs in one place only.
+        # Set through the properties so the checks run.
         self.amount = amount
         self.description = description
         self.transaction_date = transaction_date
@@ -113,15 +98,7 @@ class Transaction(ABC):
     @property
     @abstractmethod
     def signed_amount(self) -> Decimal:
-        """The amount with its effect on the balance applied.
-
-        Negative for an expense, positive for income. Because both answer
-        this the same way, a running total is just:
-
-            sum(t.signed_amount for t in items)
-
-        with no checks on what type anything is.
-        """
+        """Negative for money out, positive for money in."""
         raise NotImplementedError  # pragma: no cover - the ABC enforces this
 
     @abstractmethod
@@ -145,8 +122,7 @@ class Transaction(ABC):
             raise ValidationError("Amount is required.")
 
         try:
-            # Convert to str first. Decimal(0.1) keeps the float's rounding
-            # error, while Decimal("0.1") is exactly one tenth.
+            # Through str first, because Decimal(0.1) keeps the float's error.
             amount = Decimal(str(value).strip())
         except (InvalidOperation, ValueError, TypeError) as error:
             raise ValidationError(f"Amount {value!r} is not a valid number.") from error
@@ -160,8 +136,7 @@ class Transaction(ABC):
                 "Direction is determined by the transaction type, not the sign."
             )
 
-        # ROUND_HALF_UP is how people expect money to round. Python's default
-        # would turn 0.125 into 0.12.
+        # Round halves up, like a shop would. Python's default rounds 0.125 to 0.12.
         return amount.quantize(MONEY_PRECISION, rounding=ROUND_HALF_UP)
 
     @staticmethod
@@ -189,8 +164,7 @@ class Transaction(ABC):
         if value is None:
             return date_type.today()
 
-        # datetime is a subclass of date, so it has to be checked first.
-        # The time is dropped because this app works in whole days.
+        # Checked before date, because a datetime is also a date. The time is dropped.
         if isinstance(value, datetime):
             return value.date()
 
@@ -214,11 +188,7 @@ class Transaction(ABC):
     # ------------------------------------------------------------------
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a dictionary ready for JSON.
-
-        The shared keys are fixed here. Subclasses add their own through
-        _extra_fields, so the common part can't drift between types.
-        """
+        """A dictionary ready to save as JSON."""
         data: dict[str, Any] = {
             "transaction_id": self.transaction_id,
             "type": self.TRANSACTION_TYPE,
@@ -260,11 +230,7 @@ class Transaction(ABC):
         )
 
     def __hash__(self) -> int:
-        """Hash on the same fields as __eq__.
-
-        Defining __eq__ without this makes the class unhashable, which breaks
-        sets and dict keys.
-        """
+        """Needed so transactions work in sets and as dict keys."""
         return hash((type(self).__name__, self.transaction_id))
 
     def __lt__(self, other: "Transaction") -> bool:

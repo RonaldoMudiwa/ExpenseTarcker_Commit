@@ -7,6 +7,7 @@ could be swapped for a database later without changing anything else.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import tempfile
 from abc import ABC, abstractmethod
@@ -19,6 +20,8 @@ from .ledger import TransactionLedger
 
 # Change this if the file layout ever changes.
 FILE_FORMAT_VERSION = 1
+
+logger = logging.getLogger(__name__)
 
 
 class TransactionRepository(ABC):
@@ -71,6 +74,7 @@ class JSONTransactionRepository(TransactionRepository):
     def load(self) -> TransactionLedger:
         """Read the file. No file yet just means an empty ledger."""
         if not self._path.exists():
+            logger.debug("%s does not exist yet, starting empty", self._path)
             return TransactionLedger()
 
         try:
@@ -121,6 +125,7 @@ class JSONTransactionRepository(TransactionRepository):
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
             self._write_safely(text)
+            logger.debug("Saved %d transactions to %s", len(ledger), self._path)
         except OSError as error:
             raise StorageError(f"Could not save to {self._path}: {error}") from error
 

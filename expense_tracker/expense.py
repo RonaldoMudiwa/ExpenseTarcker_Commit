@@ -13,11 +13,6 @@ from .transaction import Transaction
 class Expense(Transaction):
     """A single purchase or payment.
 
-    Short compared with Transaction, because validating, comparing, hashing
-    and saving were all written once in the base class. An expense only adds
-    what is actually different: two extra fields, a negative direction, and
-    how it prints.
-
         >>> coffee = Expense("4.00", "Flat white", "eating out", "2026-09-20")
         >>> coffee.amount
         Decimal('4.00')
@@ -36,8 +31,7 @@ class Expense(Transaction):
         payment_method: PaymentMethod | str = PaymentMethod.OTHER,
         transaction_id: str | None = None,
     ) -> None:
-        """Create an expense.
-
+        """
         Args:
             amount: A positive amount spent.
             description: What the money went on.
@@ -49,8 +43,7 @@ class Expense(Transaction):
         Raises:
             ValidationError: If any argument fails its check.
         """
-        # Run the shared validation first. If the base class rejects
-        # something, no half built object is left behind.
+        # Shared checks first, so nothing is half set up if one fails.
         super().__init__(
             amount=amount,
             description=description,
@@ -58,7 +51,6 @@ class Expense(Transaction):
             transaction_id=transaction_id,
         )
 
-        # Through the properties, so these get validated too.
         self.category = category
         self.payment_method = payment_method
 
@@ -94,11 +86,7 @@ class Expense(Transaction):
         return -self.amount
 
     def summary_line(self) -> str:
-        """One line, e.g. "2026-09-18  -£    3.40  Eating Out      Flat white".
-
-        The column widths match Income.summary_line, so a mixed list prints
-        as a tidy table with no extra work.
-        """
+        """One line, e.g. "2026-09-18  -£    3.40  Eating Out      Flat white"."""
         return (
             f"{self.transaction_date.isoformat()}  "
             f"-£{self.amount:>8,.2f}  "
@@ -121,11 +109,7 @@ class Expense(Transaction):
     def from_dict(cls, data: Mapping[str, Any]) -> "Expense":
         """Rebuild an Expense from what to_dict produced.
 
-        A classmethod, not a staticmethod, because it needs cls to build the
-        object. Any future subclass inherits this and gets its own type back.
-
-        Missing optional keys fall back to the same defaults as __init__, so
-        a record saved by an older version still loads.
+        Missing optional keys fall back to the defaults.
 
         Raises:
             SerializationError: If amount or description is missing.

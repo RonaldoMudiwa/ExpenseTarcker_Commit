@@ -20,10 +20,7 @@ class ExpenseTrackerError(Exception):
 
 
 class ValidationError(ExpenseTrackerError):
-    """A value would leave an object in a broken state.
-
-    A negative amount, a blank description, a category that doesn't exist.
-    """
+    """A value isn't allowed, e.g. a negative amount or a blank description."""
 
 
 class SerializationError(ExpenseTrackerError):
@@ -35,24 +32,12 @@ class StorageError(ExpenseTrackerError):
 
 
 class LedgerError(ExpenseTrackerError):
-    """Something is wrong with the collection rather than one transaction.
-
-    The transaction itself may be perfectly valid. It just doesn't belong
-    here, or isn't here at all.
-    """
+    """A problem with the ledger rather than with one transaction."""
 
 
 class DuplicateTransactionError(LedgerError):
-    """This transaction is already in the ledger.
-
-    Accepting it would either double count the money or quietly drop one of
-    the two. Failing loudly beats both.
-    """
+    """This transaction is already in the ledger."""
 
 
 class TransactionNotFoundError(LedgerError):
-    """No transaction in the ledger has that id.
-
-    Raised instead of KeyError so callers don't need to know a dict is doing
-    the work underneath.
-    """
+    """No transaction in the ledger has that id."""
