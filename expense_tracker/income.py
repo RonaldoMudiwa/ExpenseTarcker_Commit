@@ -14,11 +14,6 @@ from .transaction import Transaction
 class Income(Transaction):
     """A payment received: salary, refund, freelance work.
 
-    Worth noticing what isn't here. No amount parsing, no date parsing, no
-    equality, no hashing, no to_dict. All inherited. Only the parts that are
-    genuinely different about income are written below, which is the test of
-    whether the base class was drawn in the right place.
-
         >>> pay = Income("2400.00", "September salary", "salary",
         ...              "2026-09-25", is_recurring=True)
         >>> pay.signed_amount
@@ -36,30 +31,19 @@ class Income(Transaction):
         is_recurring: bool = False,
         transaction_id: str | None = None,
     ) -> None:
-        """Create an income entry.
-
-        The amount is stored positive, same as an expense. Direction lives in
-        signed_amount, not in the sign of the stored number. If it lived in
-        the sign, validation could no longer simply reject anything below
-        zero, and every report would have to work out whether a negative
-        income meant a correction or a mistake.
-
+        """
         Args:
             amount: A positive amount received.
             description: Short label, e.g. "September salary".
             source: An IncomeSource member, or text like "salary".
             transaction_date: Date received. Defaults to today.
             is_recurring: True for regular income such as a monthly salary.
-                Day 5's reporting uses this to separate dependable income
-                from one off payments.
             transaction_id: An existing id, used when loading from storage.
 
         Raises:
             ValidationError: If any argument fails its check.
         """
-        # Base class first, so nothing is half built if a check fails.
-        # Keyword arguments, so a change to the base signature can't
-        # silently bind these to the wrong parameters.
+        # Shared checks first, so nothing is half set up if one fails.
         super().__init__(
             amount=amount,
             description=description,
@@ -90,9 +74,7 @@ class Income(Transaction):
 
     @is_recurring.setter
     def is_recurring(self, value: bool) -> None:
-        # A plain truthiness check would accept "no", 0.0 and [] and store
-        # the wrong thing without complaining. Demanding a real bool turns a
-        # caller's slip into an obvious error.
+        # Only a real True or False. Otherwise "no" would count as True.
         if not isinstance(value, bool):
             raise ValidationError(
                 f"is_recurring must be True or False, got {type(value).__name__}."
@@ -105,18 +87,11 @@ class Income(Transaction):
 
     @property
     def signed_amount(self) -> Decimal:
-        """Positive, because income raises the balance.
-
-        This one line is why the ledger can total a mixed list without ever
-        checking what type anything is.
-        """
+        """Positive, because income raises the balance."""
         return self.amount
 
     def summary_line(self) -> str:
-        """One line, e.g. "2026-09-25  +£2,400.00  Salary          Pay".
-
-        Column widths match Expense.summary_line so mixed lists line up.
-        """
+        """One line, e.g. "2026-09-25  +£2,400.00  Salary          Pay"."""
         recurring_marker = " (recurring)" if self.is_recurring else ""
         return (
             f"{self.transaction_date.isoformat()}  "
@@ -140,9 +115,7 @@ class Income(Transaction):
     def from_dict(cls, data: Mapping[str, Any]) -> "Income":
         """Rebuild an Income from what to_dict produced.
 
-        Amount and description must be present, since income with no amount
-        is corrupt rather than incomplete. Everything else falls back to the
-        same defaults as __init__, so older records still load.
+        Missing optional keys fall back to the defaults.
 
         Raises:
             SerializationError: If amount or description is missing.

@@ -9,8 +9,8 @@ validation that actually holds, and tests that document what the code promises.
 
 ## Status
 
-Day 5 of 7. Transactions, a ledger, JSON storage, search, and reports with
-budget checks. The command line interface and CSV support follow.
+Day 6 of 7. A working command line app: add, list, search, remove, reports and
+budget checks, all saved to a JSON file. CSV import and export follow.
 
 ## Quick start
 
@@ -22,7 +22,8 @@ python -m venv .venv
 .venv\Scripts\activate           # macOS or Linux: source .venv/bin/activate
 
 pip install -r requirements.txt  # pytest only, the app itself is stdlib
-python -m expense_tracker        # run the demo
+python -m expense_tracker demo   # add some sample data
+python -m expense_tracker list   # see it
 pytest                           # run the tests
 ```
 
@@ -41,13 +42,35 @@ flag imports the folder as a package first, then runs `__main__.py` inside it.
 In VS Code the ▶ button runs the broken form. Type the command in the terminal,
 or add a `launch.json` with `"module": "expense_tracker"`.
 
+## Using it
+
+```bash
+python -m expense_tracker add-expense 3.40 "Flat white" -c "eating out" -m cash
+python -m expense_tracker add-income 2400 "Salary" -s salary --recurring
+python -m expense_tracker list
+python -m expense_tracker list --month 2026-09 --category groceries --min 20
+python -m expense_tracker summary --type expense
+python -m expense_tracker report categories
+python -m expense_tracker report monthly
+python -m expense_tracker budget 2026-09 --limit groceries=250 --limit "eating out=60"
+python -m expense_tracker remove 3f2a9c1d
+```
+
+`list` shows the first 8 characters of each id, which is enough for `remove`.
+Every command takes `--help`. Data is kept in `data/transactions.json`, or
+wherever `--file` points. Add `-v` to see what the program is doing.
+
+`list`, `summary` and `report` all accept the same filters: `--month`, `--from`,
+`--to`, `--category`, `--source`, `--type`, `--search`, `--min` and `--max`.
+Filters combine, so `--category groceries --min 20` means both.
+
 ## Layout
 
 ```
 ExpenseTarcker_Commit/
 ├── expense_tracker/
 │   ├── __init__.py       What the package exports
-│   ├── __main__.py       Demo, run with python -m expense_tracker
+│   ├── __main__.py       Lets python -m expense_tracker run the app
 │   ├── enums.py          Category, PaymentMethod, IncomeSource
 │   ├── exceptions.py     Error hierarchy
 │   ├── transaction.py    Abstract base class
@@ -57,14 +80,16 @@ ExpenseTarcker_Commit/
 │   ├── factory.py        Rebuilds the right class from saved data
 │   ├── repository.py     Saving and loading
 │   ├── filters.py        Search rules that join with & | ~
-│   └── reports.py        Totals, monthly breakdown, budgets
+│   ├── reports.py        Totals, monthly breakdown, budgets
+│   └── cli.py            Command line interface
 ├── tests/
 │   ├── test_expense.py
 │   ├── test_income.py
 │   ├── test_ledger.py
 │   ├── test_repository.py
 │   ├── test_filters.py
-│   └── test_reports.py
+│   ├── test_reports.py
+│   └── test_cli.py
 ├── data/                 Runtime storage, ignored by git
 ├── pytest.ini
 └── requirements.txt
@@ -224,7 +249,7 @@ page without touching the maths.
 ## Tests
 
 ```bash
-pytest          # 274 tests
+pytest          # 316 tests
 pytest -q       # quiet
 ```
 

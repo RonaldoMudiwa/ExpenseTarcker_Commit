@@ -1,8 +1,4 @@
-"""Fixed sets of values: spending categories, payment methods, income sources.
-
-Each one inherits from str as well as Enum, so members behave like normal
-strings and json.dumps handles them without any extra work.
-"""
+"""Fixed lists of choices: categories, payment methods and income sources."""
 
 from __future__ import annotations
 
@@ -15,11 +11,7 @@ _EnumT = TypeVar("_EnumT", bound=Enum)
 
 
 class _LabelledEnum(str, Enum):
-    """Shared helpers for the enums below, so they aren't written three times.
-
-    Private because it is a detail of this module, not part of the package's
-    public API.
-    """
+    """Helpers shared by the enums below."""
 
     @property
     def label(self) -> str:
@@ -28,16 +20,7 @@ class _LabelledEnum(str, Enum):
 
     @classmethod
     def from_string(cls, raw: str) -> "_LabelledEnum":
-        """Build a member from messy text, ignoring case and separators.
-
-        Handles input from CSV files, forms and the command line, where
-        nobody types "eating_out" exactly.
-
-        Args:
-            raw: Text such as "Eating Out", "eating-out" or "  BILLS ".
-
-        Returns:
-            The matching member.
+        """Match text like "Eating Out", "eating-out" or "  BILLS ".
 
         Raises:
             ValidationError: If the text matches nothing, or isn't text.
@@ -48,8 +31,7 @@ class _LabelledEnum(str, Enum):
                 f"got {type(raw).__name__}."
             )
 
-        # Tidy the input once, then compare. Spaces and hyphens both become
-        # underscores so "Eating Out" and "eating-out" reach the same member.
+        # Spaces and hyphens become underscores, so "Eating Out" matches "eating_out".
         normalised = raw.strip().lower().replace(" ", "_").replace("-", "_")
 
         for member in cls:
@@ -68,10 +50,6 @@ class _LabelledEnum(str, Enum):
 
 def coerce_enum(value: Any, enum_class: type[_EnumT]) -> _EnumT:
     """Turn a member or a piece of text into a member of enum_class.
-
-    Every class that stores an enum field needs this same logic, so it lives
-    here once. That way Expense and Income can't drift apart in how they
-    handle bad input.
 
     Raises:
         ValidationError: If the value is neither a member nor usable text.
@@ -105,11 +83,7 @@ class Category(_LabelledEnum):
 
 @unique
 class PaymentMethod(_LabelledEnum):
-    """Where the money for an expense came from.
-
-    Kept apart from Category because the two answer different questions:
-    what the money was for, versus which account it left.
-    """
+    """How an expense was paid."""
 
     CASH = "cash"
     DEBIT_CARD = "debit_card"
@@ -121,12 +95,7 @@ class PaymentMethod(_LabelledEnum):
 
 @unique
 class IncomeSource(_LabelledEnum):
-    """Where a payment came from.
-
-    Income gets its own enum rather than reusing Category. Sharing one would
-    allow nonsense like "income of category Groceries", and every report
-    would then need guard clauses to filter it out.
-    """
+    """Where income came from. Separate from Category so income can't be "Groceries"."""
 
     SALARY = "salary"
     FREELANCE = "freelance"

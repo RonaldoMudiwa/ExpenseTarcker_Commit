@@ -297,3 +297,29 @@ class TestStringRepresentations:
 
     def test_str_of_an_empty_ledger_is_readable(self):
         assert str(TransactionLedger()) == "Ledger is empty."
+
+
+class TestResolveId:
+    """Finding a transaction from the start of its id."""
+
+    def test_unique_prefix(self, ledger, rent):
+        assert ledger.resolve_id(rent.transaction_id[:8]) == rent.transaction_id
+
+    def test_full_id(self, ledger, rent):
+        assert ledger.resolve_id(rent.transaction_id) == rent.transaction_id
+
+    def test_no_match(self, ledger):
+        with pytest.raises(TransactionNotFoundError):
+            ledger.resolve_id("zzzz")
+
+    def test_blank(self, ledger):
+        with pytest.raises(TransactionNotFoundError):
+            ledger.resolve_id("  ")
+
+    def test_more_than_one_match(self):
+        ledger = TransactionLedger([
+            Expense("1", "a", transaction_id="abc-1"),
+            Expense("1", "b", transaction_id="abc-2"),
+        ])
+        with pytest.raises(LedgerError, match="more characters"):
+            ledger.resolve_id("abc")
