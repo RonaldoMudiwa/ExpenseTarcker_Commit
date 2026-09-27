@@ -25,6 +25,7 @@ from .filters import (
 )
 from .income import Income
 from .ledger import TransactionLedger
+from .reports import Budget, ReportFormatter, ReportGenerator
 from .repository import JSONTransactionRepository
 
 # Relative to the project root, where the command is run from.
@@ -128,6 +129,22 @@ def show_search(ledger: TransactionLedger) -> None:
     print(ledger.filter_by(~TextSearchFilter("rent")))
 
 
+def show_reports(ledger: TransactionLedger) -> None:
+    """Totals by category, by month, and against a budget."""
+    report = ReportGenerator(ledger)
+    formatter = ReportFormatter()
+
+    print("\nSpending by category")
+    print(formatter.category_table(report.spending_by_category()))
+
+    print("\nMonth by month")
+    print(formatter.monthly_table(report.monthly_breakdown()))
+
+    budget = Budget({"groceries": "250", "eating out": "3", "transport": "60"})
+    print("\nBudget for September 2026")
+    print(formatter.budget_table(report.check_budget(budget, 2026, 9)))
+
+
 def show_storage(ledger: TransactionLedger) -> None:
     """Save to a file, load it back, and check nothing changed."""
     print("\nSaving and loading")
@@ -151,6 +168,7 @@ def main() -> None:
     show_totals(ledger)
     show_guard_rails(ledger)
     show_search(ledger)
+    show_reports(ledger)
     show_storage(ledger)
 
 

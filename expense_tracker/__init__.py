@@ -37,6 +37,13 @@ from .filters import (
 )
 from .income import Income
 from .ledger import TransactionLedger
+from .reports import (
+    Budget,
+    BudgetStatus,
+    MonthSummary,
+    ReportFormatter,
+    ReportGenerator,
+)
 from .repository import (
     InMemoryTransactionRepository,
     JSONTransactionRepository,
@@ -44,7 +51,7 @@ from .repository import (
 )
 from .transaction import Transaction
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 __all__ = [
     # Enums
@@ -71,6 +78,12 @@ __all__ = [
     "TextSearchFilter",
     "MatchAll",
     "all_of",
+    # Reports
+    "ReportGenerator",
+    "ReportFormatter",
+    "Budget",
+    "BudgetStatus",
+    "MonthSummary",
     # Errors
     "ExpenseTrackerError",
     "ValidationError",

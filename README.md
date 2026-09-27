@@ -9,9 +9,8 @@ validation that actually holds, and tests that document what the code promises.
 
 ## Status
 
-Day 4 of 7. Two transaction types, a collection to hold them, JSON storage,
-and search by date, category, amount and text. Reporting and the command line
-interface follow over the rest of the week.
+Day 5 of 7. Transactions, a ledger, JSON storage, search, and reports with
+budget checks. The command line interface and CSV support follow.
 
 ## Quick start
 
@@ -57,13 +56,15 @@ ExpenseTarcker_Commit/
 │   ├── ledger.py         Collection of transactions
 │   ├── factory.py        Rebuilds the right class from saved data
 │   ├── repository.py     Saving and loading
-│   └── filters.py        Search rules that join with & | ~
+│   ├── filters.py        Search rules that join with & | ~
+│   └── reports.py        Totals, monthly breakdown, budgets
 ├── tests/
 │   ├── test_expense.py
 │   ├── test_income.py
 │   ├── test_ledger.py
 │   ├── test_repository.py
-│   └── test_filters.py
+│   ├── test_filters.py
+│   └── test_reports.py
 ├── data/                 Runtime storage, ignored by git
 ├── pytest.ini
 └── requirements.txt
@@ -188,6 +189,26 @@ A new kind of search is one small class with a `matches` method. The joining
 with `&`, `|` and `~` comes from the `TransactionFilter` base class, and the
 ledger needs no changes at all.
 
+## Reports
+
+```python
+from expense_tracker import Budget, ReportFormatter, ReportGenerator
+
+report = ReportGenerator(ledger)
+formatter = ReportFormatter()
+
+print(formatter.category_table(report.spending_by_category()))
+print(formatter.monthly_table(report.monthly_breakdown()))
+
+budget = Budget({"groceries": "250", "eating out": "60"})
+print(formatter.budget_table(report.check_budget(budget, 2026, 9)))
+```
+
+`ReportGenerator` only works out numbers and returns plain data such as
+`MonthSummary` and `BudgetStatus`. `ReportFormatter` turns that data into text.
+Keeping the two apart means the same numbers can later feed a CSV file or a web
+page without touching the maths.
+
 ## Week plan
 
 | Day | Focus |
@@ -203,7 +224,7 @@ ledger needs no changes at all.
 ## Tests
 
 ```bash
-pytest          # 233 tests
+pytest          # 274 tests
 pytest -q       # quiet
 ```
 
