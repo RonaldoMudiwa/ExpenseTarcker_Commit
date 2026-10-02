@@ -7,6 +7,7 @@ Examples, run from the project root:
     python -m expense_tracker list --month 2026-09 --category groceries
     python -m expense_tracker report monthly
     python -m expense_tracker budget 2026-09 --limit groceries=250
+    python -m expense_tracker export september.csv --month 2026-09
 
 Run with --help, or any command with --help, to see every option.
 """
@@ -18,8 +19,9 @@ import logging
 import sys
 from typing import Sequence, TextIO
 
+from .csv_io import CSVExporter, CSVImporter
 from .enums import Category, IncomeSource, PaymentMethod
-from .exceptions import ExpenseTrackerError, ValidationError
+from .exceptions import DuplicateTransactionError, ExpenseTrackerError, ValidationError
 from .expense import Expense
 from .filters import (
     AmountRangeFilter,
@@ -142,6 +144,30 @@ class ExpenseTrackerCLI:
         self._print(f"Budget for {year}-{month:02d}")
         self._print(self._formatter.budget_table(statuses))
 
+    def export(self, args: argparse.Namespace) -> None:
+        count = CSVExporter().export(self._filtered(args), args.path)
+        self._print(f"Exported {count} transactions to {args.path}")
+
+    def import_csv(self, args: argparse.Namespace) -> None:
+        ledger = self._repository.load()
+        incoming = CSVImporter().read(args.path)
+
+        new = [t for t in incoming if t not in ledger]
+        skipped = len(incoming) - len(new)
+        if skipped and not args.skip_duplicates:
+            # Checked before adding anything, so a failed import changes nothing.
+            raise DuplicateTransactionError(
+                f"{skipped} transactions in {args.path} are already saved. "
+                "Use --skip-duplicates to import only the new ones."
+            )
+
+        ledger.extend(new)
+        self._repository.save(ledger)
+        message = f"Imported {len(new)} transactions from {args.path}"
+        if skipped:
+            message += f", skipped {skipped} already saved"
+        self._print(message + ".")
+
     def demo(self, args: argparse.Namespace) -> None:
         ledger = self._repository.load()
         if ledger and not args.force:
@@ -256,6 +282,15 @@ def build_parser() -> argparse.ArgumentParser:
     budget.add_argument("--limit", action="append", required=True,
                         help="CATEGORY=AMOUNT, e.g. groceries=250 (repeat for more)")
 
+    export = commands.add_parser("export", parents=[filters],
+                                 help="save transactions to a CSV file")
+    export.add_argument("path", help="e.g. september.csv")
+
+    import_csv = commands.add_parser("import", help="add transactions from a CSV file")
+    import_csv.add_argument("path")
+    import_csv.add_argument("--skip-duplicates", action="store_true",
+                            help="ignore rows that are already saved")
+
     demo = commands.add_parser("demo", help="fill the data file with sample transactions")
     demo.add_argument("--force", action="store_true",
                       help="add them even if the file already has data")
@@ -272,6 +307,8 @@ COMMANDS = {
     "summary": ExpenseTrackerCLI.summary,
     "report": ExpenseTrackerCLI.report,
     "budget": ExpenseTrackerCLI.budget,
+    "export": ExpenseTrackerCLI.export,
+    "import": ExpenseTrackerCLI.import_csv,
     "demo": ExpenseTrackerCLI.demo,
 }
 

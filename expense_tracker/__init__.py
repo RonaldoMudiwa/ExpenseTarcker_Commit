@@ -6,6 +6,7 @@ imported straight from here:
     from expense_tracker import Expense, Income, TransactionLedger
 """
 
+from .csv_io import CSVExporter, CSVImporter
 from .enums import Category, IncomeSource, PaymentMethod
 from .exceptions import (
     DuplicateTransactionError,
@@ -45,7 +46,7 @@ from .repository import (
 )
 from .transaction import Transaction
 
-__version__ = "0.6.0"
+__version__ = "1.0.0"
 
 __all__ = [
     # Enums
@@ -72,6 +73,9 @@ __all__ = [
     "TextSearchFilter",
     "MatchAll",
     "all_of",
+    # CSV
+    "CSVExporter",
+    "CSVImporter",
     # Reports
     "ReportGenerator",
     "ReportFormatter",
