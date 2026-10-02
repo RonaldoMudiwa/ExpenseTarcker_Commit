@@ -38,8 +38,7 @@ python -m venv .venv
 .venv\Scripts\activate           # macOS or Linux: source .venv/bin/activate
 pip install -r requirements.txt  # only needed for the tests
 
-python -m expense_tracker demo   # add some sample data
-python -m expense_tracker list   # see it
+python -m expense_tracker demo   # see it working with sample data
 ```
 
 Needs Python 3.10 or newer.
@@ -64,6 +63,8 @@ python -m expense_tracker export september.csv --month 2026-09
 python -m expense_tracker import bank.csv --skip-duplicates
 ```
 
+- `demo` shows the app working on sample data without saving anything, so
+  your own data stays as it was. `demo --save` keeps the samples instead.
 - `list` shows the first 8 characters of each id, which is enough for `remove`.
 - `list`, `summary`, `report` and `export` all take the same filters:
   `--month`, `--from`, `--to`, `--category`, `--source`, `--type`, `--search`,
@@ -172,7 +173,7 @@ print(ReportFormatter().budget_table(report.check_budget(budget, 2026, 9)))
 ## Tests
 
 ```bash
-pytest                                  # 353 tests
+pytest                                  # 357 tests
 pytest --cov=expense_tracker            # with coverage, currently 97%
 ```
 

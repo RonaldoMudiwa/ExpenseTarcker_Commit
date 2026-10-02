@@ -169,14 +169,36 @@ class ExpenseTrackerCLI:
         self._print(message + ".")
 
     def demo(self, args: argparse.Namespace) -> None:
+        """Show what the app can do using sample data.
+
+        Works on a throwaway copy, so your real data file is left exactly as
+        it was. Use --save to keep the samples instead.
+        """
+        if args.save:
+            self._save_samples(args.force)
+            return
+
+        ledger = TransactionLedger(sample_transactions())
+        report = ReportGenerator(ledger)
+        budget = Budget({"groceries": "100", "eating out": "20", "transport": "60"})
+
+        self._print("Demo with sample data. Nothing is saved.\n")
+        for transaction in sorted(ledger):
+            self._print(transaction.summary_line())
+        self._print(f"\n{ledger.summary()}")
+        self._print(f"\n{self._formatter.category_table(report.spending_by_category())}")
+        self._print(f"\n{self._formatter.budget_table(report.check_budget(budget, 2026, 9))}")
+        self._print("\nYour own data hasn't changed. Run 'demo --save' to keep these samples.")
+
+    def _save_samples(self, force: bool) -> None:
         ledger = self._repository.load()
-        if ledger and not args.force:
+        if ledger and not force:
             raise ValidationError(
-                "The data file already has transactions. Use --force to add the demo ones anyway."
+                "The data file already has transactions. Use --force to add the samples anyway."
             )
         ledger.extend(sample_transactions())
         self._repository.save(ledger)
-        self._print(f"Added {len(sample_transactions())} sample transactions.")
+        self._print(f"Saved {len(sample_transactions())} sample transactions.")
 
     # ------------------------------------------------------------------
     # Helpers
@@ -291,9 +313,11 @@ def build_parser() -> argparse.ArgumentParser:
     import_csv.add_argument("--skip-duplicates", action="store_true",
                             help="ignore rows that are already saved")
 
-    demo = commands.add_parser("demo", help="fill the data file with sample transactions")
+    demo = commands.add_parser("demo", help="show the app working with sample data")
+    demo.add_argument("--save", action="store_true",
+                      help="keep the samples in your data file instead")
     demo.add_argument("--force", action="store_true",
-                      help="add them even if the file already has data")
+                      help="with --save, add them even if the file already has data")
 
     return parser
 

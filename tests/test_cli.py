@@ -39,7 +39,8 @@ def run() -> Runner:
 
 @pytest.fixture
 def demo(run) -> Runner:
-    run("demo")
+    """A runner whose data already holds the sample transactions."""
+    run("demo", "--save")
     return run
 
 
@@ -170,16 +171,40 @@ class TestBudget:
 
 class TestDemo:
 
-    def test_fills_an_empty_file(self, run):
+    def test_shows_samples(self, run):
         code, out, _ = run("demo")
-        assert code == 0 and len(run.ledger) == len(sample_transactions())
+        assert code == 0
+        assert "Nothing is saved" in out
+        assert "Rent" in out and "Balance" in out and "Groceries" in out
+
+    def test_leaves_empty_data_empty(self, run):
+        run("demo")
+        assert len(run.ledger) == 0
+
+    def test_leaves_your_own_data_alone(self, run):
+        run("add-expense", "5", "My lunch")
+        run("demo")
+        assert [t.description for t in run.ledger] == ["My lunch"]
+
+    def test_works_even_with_data_already_saved(self, demo):
+        code, _, _ = demo("demo")
+        assert code == 0
+        assert len(demo.ledger) == len(sample_transactions())
+
+
+class TestDemoSave:
+
+    def test_fills_an_empty_file(self, run):
+        code, out, _ = run("demo", "--save")
+        assert code == 0 and "Saved" in out
+        assert len(run.ledger) == len(sample_transactions())
 
     def test_refuses_to_add_twice(self, demo):
-        code, _, err = demo("demo")
+        code, _, err = demo("demo", "--save")
         assert code == 1 and "--force" in err
 
     def test_force(self, demo):
-        demo("demo", "--force")
+        demo("demo", "--save", "--force")
         assert len(demo.ledger) == 2 * len(sample_transactions())
 
 

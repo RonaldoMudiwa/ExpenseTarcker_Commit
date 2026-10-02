@@ -200,7 +200,7 @@ class TestCommands:
 
     def test_export_with_filter(self, tmp_path):
         repo = InMemoryTransactionRepository()
-        self.run(repo, "demo")
+        self.run(repo, "demo", "--save")
         path = tmp_path / "groceries.csv"
         code, out, _ = self.run(repo, "export", str(path), "--category", "groceries")
         assert code == 0 and "Exported 2" in out
