@@ -269,7 +269,7 @@ class TestFiltering:
 
 
 class TestSerialization:
-    """Getting the ledger ready for Day 3's storage layer."""
+    """Turning the ledger into dictionaries for saving."""
 
     def test_to_dicts_returns_one_record_per_transaction(self, ledger):
         assert len(ledger.to_dicts()) == 3

@@ -207,3 +207,16 @@ class TestParseMonth:
 def test_no_command_shows_usage():
     with pytest.raises(SystemExit):
         main([])
+
+
+def test_runs_as_a_module(tmp_path):
+    """python -m expense_tracker should work the same way it does for a user."""
+    import subprocess
+    import sys
+
+    result = subprocess.run(
+        [sys.executable, "-m", "expense_tracker", "--file", str(tmp_path / "t.json"), "summary"],
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 0
+    assert "Ledger is empty" in result.stdout

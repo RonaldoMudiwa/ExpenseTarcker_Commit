@@ -1,18 +1,34 @@
 # Personal Expense Tracker
 
-A command line tool for recording and analysing personal spending, written in
-Python with no third party runtime dependencies.
+A command line app for tracking spending and income, written in Python using
+only the standard library.
 
-Project 1 of a 12 week portfolio. The aim is not just a working tool but a
-codebase that shows the four object oriented principles used for real reasons,
-validation that actually holds, and tests that document what the code promises.
+Project 1 of a 12 week portfolio. Built over seven days, one commit a day, with
+a focus on clean object oriented design and thorough tests.
 
-## Status
+## What it does
 
-Day 6 of 7. A working command line app: add, list, search, remove, reports and
-budget checks, all saved to a JSON file. CSV import and export follow.
+- Record expenses and income, with categories, payment methods and sources
+- Search by month, date range, category, amount or text, and combine filters
+- Reports: spending by category, income by source, month by month totals
+- Budget checks that flag any category that went over its limit
+- Saves to a JSON file, so nothing is lost between runs
+- Import from and export to CSV, so data can go in and out of Excel
 
-## Quick start
+```
+$ python -m expense_tracker report categories --month 2026-09
+Category               Spent    Share
+--------------------------------------------
+Housing         £     875.00    80.1%
+Groceries       £     110.45    10.1%
+Bills           £      62.00     5.7%
+Transport       £      41.20     3.8%
+Eating Out      £       3.40     0.3%
+--------------------------------------------
+Total           £   1,092.05
+```
+
+## Getting started
 
 ```bash
 git clone https://github.com/RonaldoMudiwa/ExpenseTarcker_Commit.git
@@ -20,239 +36,159 @@ cd ExpenseTarcker_Commit
 
 python -m venv .venv
 .venv\Scripts\activate           # macOS or Linux: source .venv/bin/activate
+pip install -r requirements.txt  # only needed for the tests
 
-pip install -r requirements.txt  # pytest only, the app itself is stdlib
 python -m expense_tracker demo   # add some sample data
 python -m expense_tracker list   # see it
-pytest                           # run the tests
 ```
 
-Needs Python 3.10 or newer, for the `X | Y` type syntax.
+Needs Python 3.10 or newer.
 
-### Running it
+Always run it with `python -m expense_tracker`, not by opening a file directly.
+The `-m` tells Python to treat the folder as a package, which the imports inside
+it need. Running `python expense_tracker/cli.py` gives an
+`attempted relative import` error.
 
-Use `python -m expense_tracker`, not `python expense_tracker/__main__.py`.
-
-The package uses relative imports (`from .enums import Category`). The leading
-dot means "the package I belong to". Run a file by its path and Python sees a
-lone script with no package around it, so the dot points at nothing and you get
-`ImportError: attempted relative import with no known parent package`. The `-m`
-flag imports the folder as a package first, then runs `__main__.py` inside it.
-
-In VS Code the ▶ button runs the broken form. Type the command in the terminal,
-or add a `launch.json` with `"module": "expense_tracker"`.
-
-## Using it
+## Commands
 
 ```bash
 python -m expense_tracker add-expense 3.40 "Flat white" -c "eating out" -m cash
 python -m expense_tracker add-income 2400 "Salary" -s salary --recurring
 python -m expense_tracker list
 python -m expense_tracker list --month 2026-09 --category groceries --min 20
-python -m expense_tracker summary --type expense
-python -m expense_tracker report categories
-python -m expense_tracker report monthly
-python -m expense_tracker budget 2026-09 --limit groceries=250 --limit "eating out=60"
 python -m expense_tracker remove 3f2a9c1d
+python -m expense_tracker summary --type expense
+python -m expense_tracker report categories     # or: sources, monthly
+python -m expense_tracker budget 2026-09 --limit groceries=250 --limit "eating out=60"
+python -m expense_tracker export september.csv --month 2026-09
+python -m expense_tracker import bank.csv --skip-duplicates
 ```
 
-`list` shows the first 8 characters of each id, which is enough for `remove`.
-Every command takes `--help`. Data is kept in `data/transactions.json`, or
-wherever `--file` points. Add `-v` to see what the program is doing.
+- `list` shows the first 8 characters of each id, which is enough for `remove`.
+- `list`, `summary`, `report` and `export` all take the same filters:
+  `--month`, `--from`, `--to`, `--category`, `--source`, `--type`, `--search`,
+  `--min` and `--max`. Using more than one means all of them must match.
+- Data is kept in `data/transactions.json`. Use `--file` to point somewhere else.
+- Add `-v` to see what the program is doing, and `--help` on any command.
 
-`list`, `summary` and `report` all accept the same filters: `--month`, `--from`,
-`--to`, `--category`, `--source`, `--type`, `--search`, `--min` and `--max`.
-Filters combine, so `--category groceries --min 20` means both.
+### CSV files
 
-## Layout
+An exported file has these columns:
 
 ```
-ExpenseTarcker_Commit/
-├── expense_tracker/
-│   ├── __init__.py       What the package exports
-│   ├── __main__.py       Lets python -m expense_tracker run the app
-│   ├── enums.py          Category, PaymentMethod, IncomeSource
-│   ├── exceptions.py     Error hierarchy
-│   ├── transaction.py    Abstract base class
-│   ├── expense.py        Money going out
-│   ├── income.py         Money coming in
-│   ├── ledger.py         Collection of transactions
-│   ├── factory.py        Rebuilds the right class from saved data
-│   ├── repository.py     Saving and loading
-│   ├── filters.py        Search rules that join with & | ~
-│   ├── reports.py        Totals, monthly breakdown, budgets
-│   └── cli.py            Command line interface
-├── tests/
-│   ├── test_expense.py
-│   ├── test_income.py
-│   ├── test_ledger.py
-│   ├── test_repository.py
-│   ├── test_filters.py
-│   ├── test_reports.py
-│   └── test_cli.py
-├── data/                 Runtime storage, ignored by git
-├── pytest.ini
-└── requirements.txt
+transaction_id,type,date,amount,description,category,payment_method,source,is_recurring
 ```
 
-## Design notes
+A file made by hand only needs `type`, `date`, `amount` and `description`.
+Headings can be in any case, and missing values use the defaults. If any row
+is wrong, nothing is imported and the error says which line to fix. Importing
+the same file twice is refused unless you add `--skip-duplicates`.
 
-**Abstraction.** `Transaction` is an abstract base class. It says what every
-money movement must be able to do (report a signed amount, describe itself in
-one line) without saying how. It cannot be instantiated.
+## How it's built
 
-**Encapsulation.** Nothing is written directly. Every field is private with a
-property setter that validates, so an object cannot end up broken, not even
-after construction:
+```
+expense_tracker/
+├── transaction.py    Abstract base class for every transaction
+├── expense.py        Money going out
+├── income.py         Money coming in
+├── enums.py          Category, PaymentMethod, IncomeSource
+├── exceptions.py     All the errors the app can raise
+├── ledger.py         A collection that refuses duplicates
+├── factory.py        Rebuilds the right class from saved data
+├── repository.py     Saving and loading (JSON file or in memory)
+├── filters.py        Search rules that join with & | ~
+├── reports.py        Totals, monthly breakdown, budgets
+├── csv_io.py         CSV import and export
+├── cli.py            The command line interface
+└── __main__.py       Lets python -m expense_tracker run the app
+```
+
+### The four OOP principles
+
+**Abstraction.** `Transaction` says what every transaction must be able to do
+without saying how, and can't be created on its own. `TransactionRepository`
+and `TransactionFilter` work the same way for storage and search.
+
+**Encapsulation.** Every field is private and checked whenever it is set, so an
+object can never hold a bad value, even after it is created:
 
 ```python
-expense.amount = -10   # raises, and expense.amount is unchanged
+expense.amount = -10   # raises ValidationError, and the amount is unchanged
 ```
 
-The same idea applies to the collection. `TransactionLedger` owns its list and
-index privately, so a duplicate or a stray string can never get in.
+**Inheritance.** Checking, comparing and saving are written once in
+`Transaction`. `Expense` and `Income` only add what is different about them.
 
-**Inheritance.** Validation, equality, hashing, ordering and serialisation are
-written once in `Transaction`. `Expense` and `Income` add only what is actually
-different, which is why each is a fraction of the length of the base class.
-
-**Polymorphism.** `signed_amount` is negative on an expense and positive on
-income, so a total is one expression with no type checks:
+**Polymorphism.** `signed_amount` is negative for an expense and positive for
+income, so the balance is one line with no type checks:
 
 ```python
 balance = sum(t.signed_amount for t in ledger)
 ```
 
-Adding a third transaction type later would need no change to that line.
+### Other decisions
 
-Three smaller decisions:
+- **Money is `Decimal`, never `float`.** As floats, `0.1 + 0.2` gives
+  `0.30000000000000004`. Amounts are rounded to pennies the way a shop would.
+- **Two transactions are equal only if they share an id.** Two identical coffees
+  on the same day are still two purchases.
+- **The ledger is not a `list` subclass.** If it were, `append()` would let
+  duplicates and wrong types straight in. It holds a list privately instead and
+  only changes through `add()` and `remove()`.
+- **Storage can be swapped.** The app only talks to `TransactionRepository`, so
+  moving to a database means writing one new class.
+- **Saving can't corrupt the file.** Data is written to a temporary file first
+  and then swapped in, so a crash part way through leaves the old file whole.
+- **Reports keep maths and display apart.** `ReportGenerator` works out the
+  numbers and `ReportFormatter` turns them into text, so the same numbers could
+  feed a web page later.
+- **Errors are clear.** Every error the user can fix comes out as one readable
+  line, not a crash.
 
-- **Money is `Decimal`, never `float`.** Binary floating point cannot hold 0.10
-  exactly, so `0.1 + 0.2` is not `0.3`. Amounts are parsed from strings and
-  rounded to two places with `ROUND_HALF_UP`, which is how people expect money
-  to round. Python's default would turn 0.125 into 0.12.
-- **Equality is by id, not by value.** Two coffees at the same price on the same
-  day are two separate purchases, so each object carries a UUID and equality
-  compares type and id, the way a database row behaves.
-- **The ledger subclasses `collections.abc.Sequence`, not `list`.** A list
-  subclass would expose `append`, `insert` and `__setitem__`, all of which skip
-  the validation, so it would promise unique ids and fail to deliver. Holding a
-  list privately and implementing `Sequence` gives the useful half and none of
-  the risky half.
-
-## Using a ledger
-
-```python
-from expense_tracker import Category, Expense, Income, IncomeSource, TransactionLedger
-
-ledger = TransactionLedger()
-ledger.add(Income("2400.00", "September salary", IncomeSource.SALARY, is_recurring=True))
-ledger.add(Expense("875.00", "Rent", Category.HOUSING))
-
-len(ledger)                       # 2
-ledger[0]                         # first added
-ledger[:1]                        # a new ledger, not a list
-sorted(ledger)                    # oldest first
-ledger.balance                    # Decimal('1525.00')
-ledger.total_expenses             # Decimal('875.00'), unsigned for display
-ledger.of_type(Income)            # a new ledger of income only
-ledger.filter_by(lambda t: t.amount > 100)
-print(ledger)                     # one formatted line per transaction
-```
-
-## Saving and loading
-
-```python
-from expense_tracker import JSONTransactionRepository
-
-repo = JSONTransactionRepository("data/transactions.json")
-repo.save(ledger)          # writes the whole ledger
-ledger = repo.load()       # empty ledger if the file doesn't exist yet
-```
-
-The rest of the app only knows about `TransactionRepository`, an abstract class
-with two methods, `load` and `save`. `JSONTransactionRepository` is one way of
-doing that. `InMemoryTransactionRepository` is another, used in tests. Moving to
-SQLite later means writing one more class, not rewriting the app.
-
-Each saved record carries a `"type"` key. `TransactionFactory` reads it and hands
-the record to `Expense` or `Income`. A new transaction type is added with
-`factory.register(NewType)`, with no edits to the factory itself.
-
-Saving writes to a temporary file first and then swaps it in, so a crash half
-way through a save leaves the old file whole. A damaged file raises
-`StorageError` with the reason, never a random crash.
-
-## Searching
-
-Each filter asks one yes or no question. They join with `&` (and), `|` (or)
-and `~` (not), and pass straight into `ledger.filter_by`:
+## Using it from Python
 
 ```python
 from expense_tracker import (
-    Category, CategoryFilter, DateRangeFilter, TextSearchFilter, all_of,
+    Budget, Category, CategoryFilter, DateRangeFilter, Expense, Income,
+    IncomeSource, JSONTransactionRepository, ReportFormatter, ReportGenerator,
 )
+
+repo = JSONTransactionRepository("data/transactions.json")
+ledger = repo.load()
+
+ledger.add(Income("2400", "Salary", IncomeSource.SALARY, "2026-09-01", is_recurring=True))
+ledger.add(Expense("62.35", "Weekly shop", Category.GROCERIES, "2026-09-03"))
+repo.save(ledger)
 
 september = DateRangeFilter.for_month(2026, 9)
 food = CategoryFilter(Category.GROCERIES, Category.EATING_OUT)
-
-ledger.filter_by(september & food)                     # food in September
-ledger.filter_by(food & ~TextSearchFilter("tesco"))    # food, not from Tesco
-ledger.filter_by(all_of(september, food)).total_expenses
-```
-
-| Filter | Keeps |
-| --- | --- |
-| `DateRangeFilter(start, end)` | Dates in the range, both ends included. `for_month(year, month)` builds one for a whole month |
-| `CategoryFilter(*categories)` | Expenses in any of the categories |
-| `IncomeSourceFilter(*sources)` | Income from any of the sources |
-| `TypeFilter(Expense)` | One kind of transaction |
-| `AmountRangeFilter(minimum, maximum)` | Amounts in the range, both ends included |
-| `TextSearchFilter(text)` | Descriptions containing the text, any case |
-
-A new kind of search is one small class with a `matches` method. The joining
-with `&`, `|` and `~` comes from the `TransactionFilter` base class, and the
-ledger needs no changes at all.
-
-## Reports
-
-```python
-from expense_tracker import Budget, ReportFormatter, ReportGenerator
+print(ledger.filter_by(september & food).total_expenses)   # 62.35
 
 report = ReportGenerator(ledger)
-formatter = ReportFormatter()
-
-print(formatter.category_table(report.spending_by_category()))
-print(formatter.monthly_table(report.monthly_breakdown()))
-
-budget = Budget({"groceries": "250", "eating out": "60"})
-print(formatter.budget_table(report.check_budget(budget, 2026, 9)))
+budget = Budget({"groceries": "250"})
+print(ReportFormatter().budget_table(report.check_budget(budget, 2026, 9)))
 ```
-
-`ReportGenerator` only works out numbers and returns plain data such as
-`MonthSummary` and `BudgetStatus`. `ReportFormatter` turns that data into text.
-Keeping the two apart means the same numbers can later feed a CSV file or a web
-page without touching the maths.
-
-## Week plan
-
-| Day | Focus |
-| --- | --- |
-| 1 | Package setup, `Transaction` base class, `Expense`, enums, exceptions |
-| 2 | `Income` subclass and the `TransactionLedger` collection |
-| 3 | JSON storage behind a repository interface |
-| 4 | Filtering and search by date range, category and text |
-| 5 | Reporting: totals by category, monthly breakdown, budget checks |
-| 6 | Command line interface with `argparse` |
-| 7 | CSV import and export, coverage pass, documentation |
 
 ## Tests
 
 ```bash
-pytest          # 316 tests
-pytest -q       # quiet
+pytest                                  # 353 tests
+pytest --cov=expense_tracker            # with coverage, currently 97%
 ```
 
-Grouped by behaviour (`TestValidation`, `TestPolymorphism`,
-`TestContainerProtocol`, `TestRoundTrip`, `TestBadFiles`) and written against the public
-interface only, so refactoring the internals does not break them.
+The tests only use the public parts of each class, so the insides can be
+changed without breaking them. Storage tests use a temporary folder and the
+command line tests use an in-memory repository, so your real data is never
+touched.
+
+## Built over seven days
+
+| Day | Commit |
+| --- | --- |
+| 1 | `Transaction` base class, `Expense`, enums and errors |
+| 2 | `Income` and the `TransactionLedger` collection |
+| 3 | JSON storage behind a repository interface |
+| 4 | Filtering and search |
+| 5 | Reports and budget checks |
+| 6 | Command line interface |
+| 7 | CSV import and export, final tests and this README |

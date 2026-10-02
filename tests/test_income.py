@@ -1,9 +1,4 @@
-"""Tests for the Income transaction type.
-
-Only the public interface is touched. Nothing here reads an attribute
-starting with an underscore, so the internals can be reworked on Day 6
-without rewriting the suite.
-"""
+"""Tests for the Income transaction type. Only public parts are tested."""
 
 from __future__ import annotations
 
